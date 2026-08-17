@@ -2,6 +2,7 @@
  * app/crowdfunding/page.tsx  （項目27：クラウドファンディング一覧）
  */
 import type { Metadata } from 'next';
+import type { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
 import { PageHeader } from '@/components/common/page-header';
@@ -29,7 +30,9 @@ export default async function CrowdfundingListPage({
   const page = Math.max(1, Number(sp.page ?? '1') || 1);
 
   // 一般公開するのは DRAFT 以外
-  const where = { status: { in: ['ACTIVE', 'SUCCEEDED', 'CLOSED'] as const } };
+ const where: Prisma.ProjectWhereInput = {
+    status: { in: ['ACTIVE', 'SUCCEEDED', 'CLOSED'] },
+  };
 
   const [total, projects, aggregate] = await Promise.all([
     prisma.project.count({ where }),
