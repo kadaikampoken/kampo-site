@@ -10,8 +10,8 @@ import { EmptyState } from '@/components/common/empty-state';
 import { NewsCard } from '@/components/cards/news-card';
 import { ProjectCard } from '@/components/cards/project-card';
 import { EventCard } from '@/components/cards/event-card';
-import { formatDate } from '@/lib/utils';
-import { SITE_DESCRIPTION } from '@/lib/constants';
+import { formatDate, formatDateTime } from '@/lib/utils';
+import { SITE_DESCRIPTION, SITE_STATS } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,7 +41,7 @@ const ACTIVITIES = [
 export default async function HomePage() {
   const now = new Date();
 
-  const [news, projects, events, timeline, memberCount] = await Promise.all([
+  const [news, projects, events, timeline, registeredUserCount] = await Promise.all([
     prisma.news.findMany({
       where: { published: true },
       orderBy: { publishedAt: 'desc' },
@@ -65,6 +65,13 @@ export default async function HomePage() {
     }),
     prisma.user.count(),
   ]);
+
+  // --- トップページの数値（lib/constants.ts の SITE_STATS で調整） ---
+  const memberCount = SITE_STATS.memberCount ?? registeredUserCount;
+  const activeYears = Math.max(1, new Date().getFullYear() - SITE_STATS.foundedYear);
+
+  // 直近の開催予定（次回の部会）
+  const nextEvent = events[0] ?? null;
 
   return (
     <>
@@ -92,23 +99,68 @@ export default async function HomePage() {
               </LinkButton>
             </div>
 
-            <dl className="mt-12 grid max-w-md grid-cols-3 gap-6">
+            <dl className="mt-12 grid max-w-xs grid-cols-2 gap-6">
               <div>
                 <dt className="text-xs text-gray-600">会員数</dt>
                 <dd className="text-2xl font-bold text-kampo-800">{memberCount}名</dd>
               </div>
               <div>
                 <dt className="text-xs text-gray-600">活動年数</dt>
-                <dd className="text-2xl font-bold text-kampo-800">10年</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-gray-600">年間開催</dt>
-                <dd className="text-2xl font-bold text-kampo-800">30回+</dd>
+                <dd className="text-2xl font-bold text-kampo-800">{activeYears}年</dd>
               </div>
             </dl>
           </div>
         </div>
       </section>
+
+      {/* ============ 次回の部会 ============ */}
+      {nextEvent && (
+        <section className="bg-kampo-800 text-white">
+          <div className="mx-auto max-w-content px-4 py-8 sm:px-6">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <p className="inline-flex items-center gap-2 rounded-full bg-kampo-700 px-3 py-1 text-xs font-medium text-sand-100">
+                  <span aria-hidden="true">📅</span> 次回の部会
+                </p>
+                <h2 className="mt-3 text-xl font-bold leading-snug sm:text-2xl">
+                  {nextEvent.title}
+                </h2>
+                <dl className="mt-4 flex flex-col gap-2 text-sm text-sand-100 sm:flex-row sm:flex-wrap sm:gap-x-8">
+                  <div className="flex gap-2">
+                    <dt className="shrink-0 text-sand-300">日時</dt>
+                    <dd>
+                      <time dateTime={nextEvent.startsAt.toISOString()}>
+                        {formatDateTime(nextEvent.startsAt)}
+                      </time>
+                      {nextEvent.endsAt && (
+                        <> 〜 {formatDateTime(nextEvent.endsAt).split(' ')[1]}</>
+                      )}
+                    </dd>
+                  </div>
+                  <div className="flex gap-2">
+                    <dt className="shrink-0 text-sand-300">場所</dt>
+                    <dd>{nextEvent.location}</dd>
+                  </div>
+                  {nextEvent.capacity !== null && (
+                    <div className="flex gap-2">
+                      <dt className="shrink-0 text-sand-300">参加予定</dt>
+                      <dd>
+                        {nextEvent._count.attendances} / {nextEvent.capacity} 名
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              </div>
+
+              <div className="shrink-0">
+                <LinkButton href={`/events/${nextEvent.id}`} variant="secondary" size="lg">
+                  詳細・参加登録
+                </LinkButton>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ============ 活動紹介 ============ */}
       <section className="mx-auto max-w-content px-4 py-16 sm:px-6">
