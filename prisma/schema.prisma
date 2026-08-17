@@ -1,0 +1,177 @@
+// =====================================================================
+// 鹿児島大学漢方医学研究会 Webサイト  Prisma スキーマ
+// DB: Neon (PostgreSQL)
+// =====================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------
+// ユーザー / 権限
+// ---------------------------------------------------------------------
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(USER)
+  /// 学年・所属（例: 医学部医学科3年）
+  affiliation  String?
+  bio          String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  attendances EventAttendance[]
+  newsPosts   News[]            @relation("NewsAuthor")
+
+  @@index([role])
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------
+// 広報（お知らせ・活動報告）
+// ---------------------------------------------------------------------
+enum NewsCategory {
+  ANNOUNCEMENT // お知らせ
+  REPORT       // 活動報告
+  MEDIA        // メディア掲載
+  RECRUIT      // 新歓・募集
+}
+
+model News {
+  id          String       @id @default(cuid())
+  title       String
+  /// 一覧に表示する要約
+  excerpt     String
+  /// 本文（Markdown ではなくプレーンテキスト＋改行で描画）
+  content     String
+  category    NewsCategory @default(ANNOUNCEMENT)
+  coverImage  String?
+  published   Boolean      @default(false)
+  publishedAt DateTime?
+  authorId    String?
+  author      User?        @relation("NewsAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([published, publishedAt])
+  @@index([category])
+  @@map("news")
+}
+
+// ---------------------------------------------------------------------
+// クラウドファンディング
+// ---------------------------------------------------------------------
+enum ProjectStatus {
+  DRAFT     // 下書き
+  ACTIVE    // 募集中
+  SUCCEEDED // 目標達成
+  CLOSED    // 終了
+}
+
+model Project {
+  id            String        @id @default(cuid())
+  title         String
+  summary       String
+  description   String
+  coverImage    String?
+  /// 目標金額（円）
+  goalAmount    Int
+  /// 現在の支援総額（円）※外部CFサイトの値を管理画面から手入力
+  currentAmount Int           @default(0)
+  supporterCount Int          @default(0)
+  status        ProjectStatus @default(DRAFT)
+  startDate     DateTime
+  endDate       DateTime
+  /// 外部クラウドファンディングサイトへのリンク
+  externalUrl   String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([status, endDate])
+  @@map("projects")
+}
+
+// ---------------------------------------------------------------------
+// イベント / 参加・不参加
+// ---------------------------------------------------------------------
+model Event {
+  id          String   @id @default(cuid())
+  title       String
+  summary     String
+  description String
+  coverImage  String?
+  location    String
+  startsAt    DateTime
+  endsAt      DateTime?
+  /// 定員（null = 定員なし）
+  capacity    Int?
+  /// 参加申込の締切
+  deadline    DateTime?
+  published   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  attendances EventAttendance[]
+
+  @@index([published, startsAt])
+  @@map("events")
+}
+
+enum AttendanceStatus {
+  ATTENDING     // 参加
+  NOT_ATTENDING // 不参加
+}
+
+model EventAttendance {
+  id        String           @id @default(cuid())
+  eventId   String
+  userId    String
+  status    AttendanceStatus
+  /// 参加者からの連絡事項
+  note      String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([userId])
+  @@index([eventId, status])
+  @@map("event_attendances")
+}
+
+// ---------------------------------------------------------------------
+// 年表（会の沿革）
+// ---------------------------------------------------------------------
+model TimelineEntry {
+  id         String   @id @default(cuid())
+  /// 西暦（例: 2018）
+  year       Int
+  /// 月（1-12、null可）
+  month      Int?
+  title      String
+  summary    String
+  /// 詳細本文
+  body       String
+  coverImage String?
+  published  Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([year, month])
+  @@map("timeline_entries")
+}

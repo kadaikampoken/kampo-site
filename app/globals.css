@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* 外部フォント配信に依存しないシステムフォント指定（ビルドが環境に左右されない） */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP',
+    'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-sand-50 text-gray-800 antialiased;
+    font-family: var(--font-sans);
+  }
+
+  /* 日本語の見出しは字間を少し詰める */
+  h1, h2, h3, h4 {
+    letter-spacing: 0.01em;
+  }
+
+  /* キーボード操作時のフォーカス可視化 */
+  :focus-visible {
+    @apply outline-none ring-2 ring-kampo-500 ring-offset-2;
+  }
+}
+
+@layer components {
+  /* 和紙のような淡い背景パターン */
+  .washi {
+    background-color: theme('colors.sand.50');
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(137, 91, 63, 0.08) 1px, transparent 0);
+    background-size: 18px 18px;
+  }
+}
+
+/* prefers-reduced-motion への配慮 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
