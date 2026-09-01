@@ -22,6 +22,8 @@ export type EventFormValues = {
   capacity: string;
   deadline: string;
   published: boolean;
+  /** 公開開始日時（datetime-local 形式の文字列） */
+  publishAt: string;
 };
 
 const EMPTY: EventFormValues = {
@@ -35,6 +37,7 @@ const EMPTY: EventFormValues = {
   capacity: '',
   deadline: '',
   published: false,
+  publishAt: '',
 };
 
 export function EventForm({
@@ -101,6 +104,23 @@ export function EventForm({
             </span>
           </span>
         </label>
+
+        <div className="mt-4 border-t border-sand-200 pt-4">
+          <Field
+            label="公開開始日時（予約公開）"
+            htmlFor="publishAt"
+            errors={state.errors?.publishAt}
+            hint="空欄のままにすると、保存した時点ですぐ公開されます。未来の日時を指定すると、その時刻になるまで一般には表示されません（自動で公開されます）。"
+          >
+            <Input
+              id="publishAt"
+              name="publishAt"
+              type="datetime-local"
+              defaultValue={v.publishAt}
+              error={Boolean(state.errors?.publishAt)}
+            />
+          </Field>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-sand-200 pt-6">

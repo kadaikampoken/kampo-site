@@ -3,7 +3,15 @@
  * サンプルデータ投入スクリプト
  *   実行:  npm run db:seed
  */
-import { PrismaClient, Role, NewsCategory, ProjectStatus, AttendanceStatus } from '@prisma/client';
+import {
+  PrismaClient,
+  Role,
+  NewsCategory,
+  ProjectStatus,
+  AttendanceStatus,
+  DonorDisclosure,
+  DonationStatus,
+} from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -22,6 +30,9 @@ async function main() {
   console.log('--- seed 開始 ---');
 
   // 既存データを削除（依存関係の順序に注意）
+  await prisma.monthlySummary.deleteMany();
+  await prisma.donation.deleteMany();
+  await prisma.bankAccount.deleteMany();
   await prisma.eventAttendance.deleteMany();
   await prisma.event.deleteMany();
   await prisma.news.deleteMany();
@@ -134,6 +145,20 @@ async function main() {
       publishedAt: daysFromNow(-70),
     },
     {
+      title: '【予約公開のサンプル】次年度の活動方針について',
+      excerpt:
+        'この記事は「予約公開」の動作確認用サンプルです。3日後の時刻になると自動的に一般公開されます。',
+      content: `この記事は予約公開のサンプルです。
+
+管理画面の「公開開始日時」に未来の日時を指定すると、その時刻になるまで一般の閲覧者には表示されません。
+指定時刻を過ぎると、何も操作しなくても自動的にサイト上に現れます。
+
+管理者としてログインしている間は、公開前でもこの記事を確認できます。`,
+      category: NewsCategory.ANNOUNCEMENT,
+      published: true,
+      publishedAt: daysFromNow(3, 9, 0),
+    },
+    {
       title: '【下書き】夏合宿の企画について',
       excerpt: '検討中の内容です。公開前の下書き記事です。',
       content: '夏合宿の候補地・日程を検討中です。決まり次第お知らせします。',
@@ -183,6 +208,17 @@ async function main() {
   50,000円 上記＋薬膳茶の詰め合わせ
 
 ご支援のほど、何卒よろしくお願いいたします。`,
+        purpose: `実物の生薬に触れる経験は、教科書だけでは決して得られない学びをもたらします。
+
+しかし標本の購入と保管には相応の費用がかかり、学生の会費だけでは賄いきれません。
+一度整備すれば、後輩たちが何年にもわたって使い続けられる資産になります。
+そのための初期費用として、皆さまのお力をお借りしたいと考えています。`,
+        fundUsage: `標本購入費　　　　900,000円
+標本ケース・什器　450,000円
+カタログ制作費　　100,000円
+手数料等　　　　　 50,000円
+────────────────
+合計　　　　　1,500,000円`,
         goalAmount: 1_500_000,
         currentAmount: 985_000,
         supporterCount: 87,
@@ -208,6 +244,14 @@ async function main() {
   会場費・備品      60,000円
   手数料等          20,000円
   合計             600,000円`,
+        purpose: `鹿児島県は離島が多く、医療資源の地域格差が課題となっています。
+学生が現地に赴いて講座を開くには、どうしても渡航費が必要になります。`,
+        fundUsage: `渡航費・交通費　400,000円
+資料印刷費　　　120,000円
+会場費・備品　　 60,000円
+手数料等　　　　 20,000円
+────────────────
+合計　　　　　　600,000円`,
         goalAmount: 600_000,
         currentAmount: 612_000,
         supporterCount: 54,
@@ -442,6 +486,98 @@ async function main() {
     await prisma.timelineEntry.create({ data: { ...t, published: true } });
   }
   console.log(`年表: ${timeline.length} 件`);
+
+  // ------------------------------------------------------------------
+  // 振込先口座
+  // ------------------------------------------------------------------
+  await prisma.bankAccount.create({
+    data: {
+      id: 'default',
+      bankName: '鹿児島銀行',
+      branchName: '桜ヶ丘支店',
+      branchCode: '143',
+      accountType: '普通預金',
+      accountNumber: '3072458',
+      accountHolder: '鹿児島大学医学部漢方医学研究会',
+      note: '振込手数料は恐れ入りますがご負担ください。お振込後、振込完了フォームからご報告をお願いします。',
+    },
+  });
+  console.log('振込先口座: 1 件');
+
+  // ------------------------------------------------------------------
+  // 支援（振込報告）のサンプル
+  // ------------------------------------------------------------------
+  const lastMonth = new Date();
+  lastMonth.setMonth(lastMonth.getMonth() - 1);
+  const ly = lastMonth.getFullYear();
+  const lm = lastMonth.getMonth() + 1;
+  const inLastMonth = (day: number) => new Date(ly, lm - 1, day, 12, 0, 0, 0);
+
+  const donationSamples = [
+    { name: '山田 太郎', email: 'yamada@example.com', amount: 30_000, transferName: 'ヤマダ タロウ', day: 3, disclosure: DonorDisclosure.REAL_NAME, displayName: null, status: DonationStatus.CONFIRMED, projectIndex: 0 },
+    { name: '佐藤 花子', email: 'sato@example.com', amount: 10_000, transferName: 'サトウ ハナコ', day: 5, disclosure: DonorDisclosure.REAL_NAME, displayName: null, status: DonationStatus.CONFIRMED, projectIndex: 0 },
+    { name: '鈴木 一郎', email: 'suzuki@example.com', amount: 20_000, transferName: 'カブシキガイシャ マルマル', day: 9, disclosure: DonorDisclosure.CUSTOM_NAME, displayName: '〇〇株式会社', status: DonationStatus.CONFIRMED, projectIndex: 0 },
+    { name: '高橋 二郎', email: 'takahashi@example.com', amount: 5_000, transferName: 'タカハシ ジロウ', day: 14, disclosure: DonorDisclosure.ANONYMOUS, displayName: null, status: DonationStatus.CONFIRMED, projectIndex: 1 },
+    { name: '伊藤 三郎', email: 'ito@example.com', amount: 12_000, transferName: 'イトウ サブロウ', day: 21, disclosure: DonorDisclosure.ANONYMOUS, displayName: null, status: DonationStatus.CONFIRMED, projectIndex: null },
+    { name: '渡辺 四郎', email: 'watanabe@example.com', amount: 5_000, transferName: 'ワタナベ シロウ', day: 26, disclosure: DonorDisclosure.REAL_NAME, displayName: null, status: DonationStatus.REPORTED, projectIndex: 0 },
+  ];
+
+  for (const d of donationSamples) {
+    await prisma.donation.create({
+      data: {
+        projectId: d.projectIndex === null ? null : projects[d.projectIndex].id,
+        name: d.name,
+        email: d.email,
+        amount: d.amount,
+        transferName: d.transferName,
+        transferDate: inLastMonth(d.day),
+        disclosure: d.disclosure,
+        displayName: d.displayName,
+        status: d.status,
+        confirmedAt: d.status === DonationStatus.CONFIRMED ? inLastMonth(d.day + 1) : null,
+        reportedAt: inLastMonth(d.day),
+      },
+    });
+  }
+  console.log(`支援報告: ${donationSamples.length} 件（うち1件は入金未確認）`);
+
+  // ------------------------------------------------------------------
+  // 月次集計（先月分を確定済みとして作成）
+  // ------------------------------------------------------------------
+  const confirmed = donationSamples.filter((d) => d.status === DonationStatus.CONFIRMED);
+  const overallAmount = confirmed.reduce((s, d) => s + d.amount, 0);
+  const overallUnique = new Set(confirmed.map((d) => d.email)).size;
+
+  await prisma.monthlySummary.create({
+    data: {
+      year: ly,
+      month: lm,
+      projectId: null,
+      projectKey: 'ALL',
+      totalAmount: overallAmount,
+      donationCount: confirmed.length,
+      uniqueSupporterCount: overallUnique,
+      published: true,
+    },
+  });
+
+  for (const [index, project] of projects.entries()) {
+    const rows = confirmed.filter((d) => d.projectIndex === index);
+    if (rows.length === 0) continue;
+    await prisma.monthlySummary.create({
+      data: {
+        year: ly,
+        month: lm,
+        projectId: project.id,
+        projectKey: project.id,
+        totalAmount: rows.reduce((s, d) => s + d.amount, 0),
+        donationCount: rows.length,
+        uniqueSupporterCount: new Set(rows.map((d) => d.email)).size,
+        published: true,
+      },
+    });
+  }
+  console.log(`月次集計: ${ly}年${lm}月分を確定済みとして作成`);
 
   console.log('--- seed 完了 ---');
   console.log(`管理者ログイン: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);

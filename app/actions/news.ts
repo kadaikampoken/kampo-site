@@ -39,7 +39,8 @@ export async function createNewsAction(
   await prisma.news.create({
     data: {
       ...data,
-      publishedAt: data.published ? new Date() : null,
+      // 公開日時が指定されていればそれを使う（未来日時なら予約公開になる）
+      publishedAt: data.published ? data.publishedAt ?? new Date() : null,
       authorId: guard.user.id,
     },
   });
@@ -69,8 +70,10 @@ export async function updateNewsAction(
     where: { id },
     data: {
       ...data,
-      // 初めて公開するときだけ公開日時をセットする
-      publishedAt: data.published ? current.publishedAt ?? new Date() : null,
+      // 指定があればその日時、なければ既存の値（初公開なら現在時刻）
+      publishedAt: data.published
+        ? data.publishedAt ?? current.publishedAt ?? new Date()
+        : null,
     },
   });
 

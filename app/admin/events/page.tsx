@@ -12,6 +12,7 @@ import { DeleteButton } from '@/components/admin/delete-button';
 import { Flash } from '@/components/admin/flash';
 import { deleteEventAction } from '@/app/actions/events';
 import { formatDateTime, truncate } from '@/lib/utils';
+import { eventState, PUBLISH_STATE_LABEL, PUBLISH_STATE_TONE } from '@/lib/visibility';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'イベント管理' };
@@ -79,10 +80,17 @@ export default async function AdminEventsPage({ searchParams }: { searchParams: 
                     </Link>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
-                    <div className="flex flex-col gap-1">
-                      <Badge tone={e.published ? 'green' : 'gray'}>
-                        {e.published ? '公開中' : '非公開'}
+                    <div className="flex flex-col items-start gap-1">
+                      <Badge tone={PUBLISH_STATE_TONE[eventState(e, now)]}>
+                        {eventState(e, now) === 'DRAFT'
+                          ? '非公開'
+                          : PUBLISH_STATE_LABEL[eventState(e, now)]}
                       </Badge>
+                      {eventState(e, now) === 'SCHEDULED' && (
+                        <span className="text-xs text-amber-800">
+                          {formatDateTime(e.publishAt)} に公開
+                        </span>
+                      )}
                       {e.startsAt < now && <Badge tone="gray">終了</Badge>}
                     </div>
                   </td>

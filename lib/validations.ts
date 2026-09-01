@@ -4,7 +4,14 @@
  * サーバーアクションで必ず parse してから DB に渡す。
  */
 import { z } from 'zod';
-import { NewsCategory, ProjectStatus, AttendanceStatus, Role } from '@prisma/client';
+import {
+  NewsCategory,
+  ProjectStatus,
+  AttendanceStatus,
+  Role,
+  DonationStatus,
+  DonorDisclosure,
+} from '@prisma/client';
 
 /* ------------------------------------------------------------------ */
 /* 共通ヘルパー                                                        */
@@ -45,6 +52,12 @@ const optionalDateFromString = z.preprocess((v) => {
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? null : d;
 }, z.date().nullable());
+
+/** 任意の整数（空欄は null） */
+const optionalIntFromString = z.preprocess(
+  (v) => (typeof v === 'string' && v.trim() === '' ? null : v === null ? null : Number(v)),
+  z.number().int({ message: '整数で入力してください' }).nullable()
+);
 
 /** 任意のURL（空文字はnull） */
 const optionalUrl = z.preprocess(
@@ -133,6 +146,8 @@ export const newsSchema = z.object({
   }),
   coverImage: optionalUrl,
   published: checkbox,
+  /** 公開開始日時。空欄なら保存時＝即時公開 */
+  publishedAt: optionalDateFromString,
 });
 
 /* ------------------------------------------------------------------ */
@@ -144,10 +159,15 @@ export const projectSchema = z
     title: z.string().min(1, { message: 'タイトルを入力してください' }).max(120),
     summary: z.string().min(1, { message: '概要を入力してください' }).max(200),
     description: z.string().min(1, { message: '本文を入力してください' }),
+    /** 支援を募集する目的（任意） */
+    purpose: z.preprocess(emptyToNull, z.string().max(2000).nullable()),
+    /** 支援金の用途（任意） */
+    fundUsage: z.preprocess(emptyToNull, z.string().max(2000).nullable()),
     coverImage: optionalUrl,
-    goalAmount: numberFromString('目標金額を数値で入力してください')
-      .refine((v) => Number.isInteger(v), { message: '目標金額は整数で入力してください' })
-      .refine((v) => v >= 1000, { message: '目標金額は1,000円以上で入力してください' }),
+    /** 目標金額。未設定可 */
+    goalAmount: optionalIntFromString.refine((v) => v === null || v >= 1000, {
+      message: '目標金額は1,000円以上で入力してください（設定しない場合は空欄）',
+    }),
     currentAmount: numberFromString('支援額を数値で入力してください').refine((v) => v >= 0, {
       message: '支援額は0円以上で入力してください',
     }),
@@ -157,11 +177,16 @@ export const projectSchema = z
     status: z.nativeEnum(ProjectStatus, {
       errorMap: () => ({ message: 'ステータスを選択してください' }),
     }),
-    startDate: dateFromString('開始日を入力してください'),
-    endDate: dateFromString('終了日を入力してください'),
+    /** 募集期間。未設定可 */
+    startDate: optionalDateFromString,
+    endDate: optionalDateFromString,
+    /** 振込による支援の受付を有効にするか */
+    acceptingSupport: checkbox,
     externalUrl: optionalUrl,
+    /** 公開開始日時。空欄なら即時公開 */
+    publishAt: optionalDateFromString,
   })
-  .refine((d) => d.endDate >= d.startDate, {
+  .refine((d) => !d.startDate || !d.endDate || d.endDate >= d.startDate, {
     message: '終了日は開始日以降の日付を指定してください',
     path: ['endDate'],
   });
@@ -189,6 +214,8 @@ export const eventSchema = z
     ),
     deadline: optionalDateFromString,
     published: checkbox,
+    /** 公開開始日時。空欄なら即時公開 */
+    publishAt: optionalDateFromString,
   })
   .refine((d) => !d.endsAt || d.endsAt >= d.startsAt, {
     message: '終了日時は開始日時以降を指定してください',
@@ -241,6 +268,100 @@ export const timelineSchema = z.object({
 export const userRoleSchema = z.object({
   userId: z.string().min(1),
   role: z.nativeEnum(Role, { errorMap: () => ({ message: '権限を選択してください' }) }),
+});
+
+/* ------------------------------------------------------------------ */
+/* クラウドファンディング：振込完了フォーム（一般公開）                */
+/* ------------------------------------------------------------------ */
+
+export const donationReportSchema = z
+  .object({
+    name: z
+      .string()
+      .min(1, { message: 'お名前を入力してください' })
+      .max(60, { message: 'お名前は60文字以内で入力してください' }),
+    email: z
+      .string()
+      .min(1, { message: 'メールアドレスを入力してください' })
+      .email({ message: 'メールアドレスの形式が正しくありません' })
+      .max(255),
+    projectId: z.preprocess(emptyToNull, z.string().nullable()),
+    amount: numberFromString('支援金額を数値で入力してください')
+      .refine((v) => Number.isInteger(v), { message: '支援金額は整数で入力してください' })
+      .refine((v) => v >= 1, { message: '支援金額は1円以上で入力してください' })
+      .refine((v) => v <= 100_000_000, { message: '金額が大きすぎます。内容をご確認ください' }),
+    transferName: z
+      .string()
+      .min(1, { message: '振込名義を入力してください' })
+      .max(60, { message: '振込名義は60文字以内で入力してください' }),
+    transferDate: dateFromString('振込日を入力してください'),
+    disclosure: z.nativeEnum(DonorDisclosure, {
+      errorMap: () => ({ message: '支援者名の公開設定を選択してください' }),
+    }),
+    displayName: z.preprocess(
+      emptyToNull,
+      z.string().max(60, { message: '掲載希望名は60文字以内で入力してください' }).nullable()
+    ),
+    note: z.preprocess(
+      emptyToNull,
+      z.string().max(1000, { message: '備考は1000文字以内で入力してください' }).nullable()
+    ),
+  })
+  .refine((d) => d.disclosure !== 'CUSTOM_NAME' || Boolean(d.displayName), {
+    message: '掲載を希望するお名前を入力してください',
+    path: ['displayName'],
+  })
+  .refine((d) => d.transferDate <= new Date(Date.now() + 24 * 60 * 60 * 1000), {
+    message: '振込日に未来の日付は指定できません',
+    path: ['transferDate'],
+  });
+
+/* ------------------------------------------------------------------ */
+/* クラウドファンディング：管理者操作                                  */
+/* ------------------------------------------------------------------ */
+
+export const donationStatusSchema = z.object({
+  id: z.string().min(1),
+  status: z.nativeEnum(DonationStatus, {
+    errorMap: () => ({ message: '状態を選択してください' }),
+  }),
+});
+
+export const donationAdminSchema = z.object({
+  id: z.string().min(1),
+  status: z.nativeEnum(DonationStatus),
+  amount: numberFromString('支援金額を数値で入力してください').refine((v) => v >= 0, {
+    message: '支援金額は0円以上で入力してください',
+  }),
+  adminMemo: z.preprocess(emptyToNull, z.string().max(500).nullable()),
+});
+
+export const bankAccountSchema = z.object({
+  bankName: z.string().min(1, { message: '金融機関名を入力してください' }).max(60),
+  branchName: z.string().min(1, { message: '支店名を入力してください' }).max(60),
+  branchCode: z
+    .string()
+    .min(1, { message: '支店コードを入力してください' })
+    .max(10)
+    .regex(/^[0-9]+$/, { message: '支店コードは数字で入力してください' }),
+  accountType: z.string().min(1, { message: '口座種別を入力してください' }).max(20),
+  accountNumber: z
+    .string()
+    .min(1, { message: '口座番号を入力してください' })
+    .max(20)
+    .regex(/^[0-9]+$/, { message: '口座番号は数字で入力してください' }),
+  accountHolder: z.string().min(1, { message: '口座名義を入力してください' }).max(100),
+  accountHolderKana: z.preprocess(emptyToNull, z.string().max(100).nullable()),
+  note: z.preprocess(emptyToNull, z.string().max(500).nullable()),
+});
+
+export const monthlyConfirmSchema = z.object({
+  year: numberFromString('年を入力してください')
+    .refine((v) => Number.isInteger(v), { message: '年は整数で入力してください' })
+    .refine((v) => v >= 2000 && v <= 2200, { message: '年は2000〜2200で入力してください' }),
+  month: numberFromString('月を入力してください')
+    .refine((v) => Number.isInteger(v), { message: '月は整数で入力してください' })
+    .refine((v) => v >= 1 && v <= 12, { message: '月は1〜12で入力してください' }),
 });
 
 /* ------------------------------------------------------------------ */

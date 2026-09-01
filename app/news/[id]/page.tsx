@@ -13,14 +13,15 @@ import { ArticleBody } from '@/components/common/article-body';
 import { LinkButton } from '@/components/ui/button';
 import { formatDate, truncate } from '@/lib/utils';
 import { NEWS_CATEGORY_LABEL } from '@/lib/constants';
+import { isNewsVisible, newsState } from '@/lib/visibility';
 
 export const dynamic = 'force-dynamic';
 
 type Params = Promise<{ id: string }>;
 
-async function getNews(id: string, isAdmin: boolean) {
-  return prisma.news.findFirst({
-    where: { id, ...(isAdmin ? {} : { published: true }) },
+async function getNews(id: string) {
+  return prisma.news.findUnique({
+    where: { id },
     include: { author: { select: { name: true } } },
   });
 }
@@ -29,9 +30,10 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const { id } = await params;
   const news = await prisma.news.findUnique({
     where: { id },
-    select: { title: true, excerpt: true, published: true },
+    select: { title: true, excerpt: true, published: true, publishedAt: true },
   });
-  if (!news || !news.published) return { title: '記事が見つかりません' };
+  // 予約公開の記事は公開時刻まで検索エンジンにも出さない
+  if (!news || !isNewsVisible(news)) return { title: '記事が見つかりません' };
   return {
     title: news.title,
     description: truncate(news.excerpt, 120),
@@ -43,19 +45,24 @@ export default async function NewsDetailPage({ params }: { params: Params }) {
   const session = await auth();
   const isAdmin = session?.user?.role === 'ADMIN';
 
-  const news = await getNews(id, isAdmin);
+  const news = await getNews(id);
   if (!news) notFound();
 
-  // 前後の記事
+  // 未公開（下書き・予約公開）の記事は管理者のみ閲覧可
+  const now = new Date();
+  const state = newsState(news, now);
+  if (state !== 'PUBLISHED' && !isAdmin) notFound();
+
+  // 前後の記事（すでに公開済みのものだけを対象にする）
   const publishedAt = news.publishedAt ?? news.createdAt;
   const [prev, next] = await Promise.all([
     prisma.news.findFirst({
-      where: { published: true, publishedAt: { lt: publishedAt } },
+      where: { published: true, publishedAt: { lt: publishedAt, lte: now } },
       orderBy: { publishedAt: 'desc' },
       select: { id: true, title: true },
     }),
     prisma.news.findFirst({
-      where: { published: true, publishedAt: { gt: publishedAt } },
+      where: { published: true, publishedAt: { gt: publishedAt, lte: now } },
       orderBy: { publishedAt: 'asc' },
       select: { id: true, title: true },
     }),
@@ -65,9 +72,15 @@ export default async function NewsDetailPage({ params }: { params: Params }) {
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
       <Breadcrumbs items={[{ label: '広報', href: '/news' }, { label: truncate(news.title, 24) }]} />
 
-      {!news.published && (
+      {state === 'DRAFT' && (
         <p className="mb-6 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           この記事は<strong>下書き</strong>です。管理者のみ閲覧できます。
+        </p>
+      )}
+      {state === 'SCHEDULED' && (
+        <p className="mb-6 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          この記事は<strong>予約公開</strong>です。
+          {formatDate(news.publishedAt)}以降に自動で一般公開されます。それまでは管理者のみ閲覧できます。
         </p>
       )}
 

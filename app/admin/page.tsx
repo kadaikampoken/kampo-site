@@ -29,6 +29,8 @@ export default async function AdminDashboardPage() {
     nextEvents,
     recentUsers,
     fundSum,
+    pendingDonations,
+    confirmedDonations,
   ] = await Promise.all([
     prisma.news.count(),
     prisma.news.count({ where: { published: false } }),
@@ -48,6 +50,8 @@ export default async function AdminDashboardPage() {
     }),
     prisma.user.findMany({ orderBy: { createdAt: 'desc' }, take: 5 }),
     prisma.project.aggregate({ _sum: { currentAmount: true } }),
+    prisma.donation.count({ where: { status: 'REPORTED' } }),
+    prisma.donation.count({ where: { status: 'CONFIRMED' } }),
   ]);
 
   const stats = [
@@ -57,6 +61,12 @@ export default async function AdminDashboardPage() {
     { label: '登録ユーザー', value: `${userTotal} 名`, sub: `管理者 ${adminTotal} 名`, href: '/admin/users' },
     { label: '参加登録', value: `${attendanceTotal} 件`, sub: '参加ステータスのみ', href: '/admin/participants' },
     { label: '年表エントリ', value: `${timelineTotal} 件`, sub: '公開中の項目を含む', href: '/admin/history' },
+    {
+      label: '入金未確認の支援報告',
+      value: `${pendingDonations} 件`,
+      sub: `入金確認済み ${confirmedDonations} 件`,
+      href: '/admin/donations?status=REPORTED',
+    },
   ];
 
   return (

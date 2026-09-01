@@ -12,6 +12,7 @@ import { NewsCard } from '@/components/cards/news-card';
 import { Pagination } from '@/components/ui/pagination';
 import { NEWS_CATEGORY_LABEL, NEWS_CATEGORY_OPTIONS, PAGE_SIZE } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { visibleNewsWhere } from '@/lib/visibility';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +33,7 @@ export default async function NewsListPage({ searchParams }: { searchParams: Sea
   const category = isCategory(sp.category) ? sp.category : undefined;
 
   const where: Prisma.NewsWhereInput = {
-    published: true,
+    ...visibleNewsWhere(),
     ...(category ? { category } : {}),
   };
 

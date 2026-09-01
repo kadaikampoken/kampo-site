@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/common/page-header';
 import { NewsForm } from '@/components/admin/news-form';
 import { DeleteButton } from '@/components/admin/delete-button';
 import { updateNewsAction, deleteNewsAction } from '@/app/actions/news';
-import { formatDateTime, truncate } from '@/lib/utils';
+import { formatDateTime, toDateTimeLocalValue, truncate } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: '広報の編集' };
@@ -46,6 +46,7 @@ export default async function EditNewsPage({ params }: { params: Params }) {
             category: news.category,
             coverImage: news.coverImage ?? '',
             published: news.published,
+            publishedAt: toDateTimeLocalValue(news.publishedAt),
           }}
         />
       </div>

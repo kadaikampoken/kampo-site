@@ -1,5 +1,6 @@
 /**
  * components/cards/project-card.tsx
+ * 目標金額・募集期間は「未設定」を許容する。
  */
 import Link from 'next/link';
 import type { Project } from '@prisma/client';
@@ -16,8 +17,9 @@ const toneByStatus = {
 } as const;
 
 export function ProjectCard({ project }: { project: Project }) {
-  const rate = achievementRate(project.currentAmount, project.goalAmount);
-  const remaining = daysLeft(project.endDate);
+  const hasGoal = project.goalAmount !== null && project.goalAmount > 0;
+  const rate = hasGoal ? achievementRate(project.currentAmount, project.goalAmount ?? 0) : 0;
+  const remaining = project.endDate ? daysLeft(project.endDate) : null;
 
   return (
     <article className="group h-full rounded-lg border border-sand-200 bg-white shadow-sm transition-shadow hover:shadow-md">
@@ -34,14 +36,24 @@ export function ProjectCard({ project }: { project: Project }) {
 
         <div className="mt-5">
           <div className="mb-1.5 flex items-baseline justify-between">
-            <span className="text-xl font-bold text-kampo-800">{formatYen(project.currentAmount)}</span>
-            <span className="text-sm font-semibold text-sand-700">{rate}%</span>
+            <span className="text-xl font-bold text-kampo-800">
+              {formatYen(project.currentAmount)}
+            </span>
+            {hasGoal && <span className="text-sm font-semibold text-sand-700">{rate}%</span>}
           </div>
-          <ProgressBar rate={rate} />
+
+          {hasGoal ? (
+            <ProgressBar rate={rate} />
+          ) : (
+            <p className="text-xs text-gray-500">目標金額は設定していません</p>
+          )}
+
           <dl className="mt-3 grid grid-cols-3 gap-2 text-xs text-gray-600">
             <div>
               <dt className="text-gray-500">目標</dt>
-              <dd className="font-medium">{formatYen(project.goalAmount)}</dd>
+              <dd className="font-medium">
+                {hasGoal ? formatYen(project.goalAmount ?? 0) : '—'}
+              </dd>
             </div>
             <div>
               <dt className="text-gray-500">支援者</dt>
@@ -50,7 +62,7 @@ export function ProjectCard({ project }: { project: Project }) {
             <div>
               <dt className="text-gray-500">残り</dt>
               <dd className="font-medium">
-                {project.status === 'ACTIVE' ? `${remaining}日` : '—'}
+                {project.status === 'ACTIVE' && remaining !== null ? `${remaining}日` : '—'}
               </dd>
             </div>
           </dl>

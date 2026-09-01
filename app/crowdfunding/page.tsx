@@ -11,6 +11,9 @@ import { ProjectCard } from '@/components/cards/project-card';
 import { Pagination } from '@/components/ui/pagination';
 import { PAGE_SIZE } from '@/lib/constants';
 import { formatYen } from '@/lib/utils';
+import { visibleProjectWhere } from '@/lib/visibility';
+import { getPublishedTotals } from '@/lib/donations';
+import { LinkButton } from '@/components/ui/button';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,12 +32,10 @@ export default async function CrowdfundingListPage({
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.page ?? '1') || 1);
 
-  // 一般公開するのは DRAFT 以外
- const where: Prisma.ProjectWhereInput = {
-    status: { in: ['ACTIVE', 'SUCCEEDED', 'CLOSED'] },
-  };
+  // 一般公開するのは「準備中」以外 かつ 公開開始日時を過ぎたもの
+  const where: Prisma.ProjectWhereInput = visibleProjectWhere();
 
-  const [total, projects, aggregate] = await Promise.all([
+  const [total, projects, totals] = await Promise.all([
     prisma.project.count({ where }),
     prisma.project.findMany({
       where,
@@ -42,10 +43,8 @@ export default async function CrowdfundingListPage({
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
-    prisma.project.aggregate({
-      where,
-      _sum: { currentAmount: true, supporterCount: true },
-    }),
+    // 公開する数値は「管理者が月末に確定した集計」のみを使う
+    getPublishedTotals(null),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -61,17 +60,17 @@ export default async function CrowdfundingListPage({
       />
 
       {/* サマリー */}
-      <dl className="mb-10 grid gap-4 rounded-lg border border-sand-200 bg-white p-6 sm:grid-cols-3">
+      <dl className="mb-6 grid gap-4 rounded-lg border border-sand-200 bg-white p-6 sm:grid-cols-3">
         <div>
-          <dt className="text-xs text-gray-500">累計支援額</dt>
+          <dt className="text-xs text-gray-500">累計支援総額</dt>
           <dd className="mt-1 text-2xl font-bold text-kampo-800">
-            {formatYen(aggregate._sum.currentAmount ?? 0)}
+            {formatYen(totals.totalAmount)}
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-gray-500">累計支援者数</dt>
+          <dt className="text-xs text-gray-500">累計支援者数（延べ人数）</dt>
           <dd className="mt-1 text-2xl font-bold text-kampo-800">
-            {aggregate._sum.supporterCount ?? 0} 人
+            {totals.uniqueSupporterCount} 名
           </dd>
         </div>
         <div>
@@ -79,6 +78,13 @@ export default async function CrowdfundingListPage({
           <dd className="mt-1 text-2xl font-bold text-kampo-800">{total} 件</dd>
         </div>
       </dl>
+
+      <div className="mb-10 flex flex-wrap gap-3">
+        <LinkButton href="/crowdfunding/support">銀行振込で支援する</LinkButton>
+        <LinkButton href="/crowdfunding/results" variant="outline">
+          月別の支援実績を見る
+        </LinkButton>
+      </div>
 
       {projects.length === 0 ? (
         <EmptyState

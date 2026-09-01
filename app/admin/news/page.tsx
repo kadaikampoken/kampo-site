@@ -12,7 +12,8 @@ import { Pagination } from '@/components/ui/pagination';
 import { DeleteButton } from '@/components/admin/delete-button';
 import { Flash } from '@/components/admin/flash';
 import { deleteNewsAction, toggleNewsPublishedAction } from '@/app/actions/news';
-import { formatDate, truncate } from '@/lib/utils';
+import { formatDate, formatDateTime, truncate } from '@/lib/utils';
+import { newsState, PUBLISH_STATE_LABEL, PUBLISH_STATE_TONE } from '@/lib/visibility';
 import { ADMIN_PAGE_SIZE, NEWS_CATEGORY_LABEL } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,7 @@ type SearchParams = Promise<Record<string, string | undefined>>;
 export default async function AdminNewsPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.page ?? '1') || 1);
+  const now = new Date();
 
   const [total, items] = await Promise.all([
     prisma.news.count(),
@@ -80,11 +82,16 @@ export default async function AdminNewsPage({ searchParams }: { searchParams: Se
                       <form action={toggleNewsPublishedAction}>
                         <input type="hidden" name="id" value={n.id} />
                         <button type="submit" title="クリックで公開/下書きを切り替え">
-                          <Badge tone={n.published ? 'green' : 'gray'}>
-                            {n.published ? '公開中' : '下書き'}
+                          <Badge tone={PUBLISH_STATE_TONE[newsState(n, now)]}>
+                            {PUBLISH_STATE_LABEL[newsState(n, now)]}
                           </Badge>
                         </button>
                       </form>
+                      {newsState(n, now) === 'SCHEDULED' && (
+                        <p className="mt-1 text-xs text-amber-800">
+                          {formatDateTime(n.publishedAt)} に公開
+                        </p>
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">
                       {formatDate(n.updatedAt)}

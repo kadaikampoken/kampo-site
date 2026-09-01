@@ -58,6 +58,7 @@ export default async function EditEventPage({ params }: { params: Params }) {
             capacity: event.capacity === null ? '' : String(event.capacity),
             deadline: toDateTimeLocalValue(event.deadline),
             published: event.published,
+            publishAt: toDateTimeLocalValue(event.publishAt),
           }}
         />
       </div>

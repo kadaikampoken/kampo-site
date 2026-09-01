@@ -13,7 +13,8 @@ import { ArticleBody } from '@/components/common/article-body';
 import { LinkButton } from '@/components/ui/button';
 import { Alert } from '@/components/ui/alert';
 import { AttendanceForm } from '@/components/attendance-form';
-import { formatDateTime, truncate } from '@/lib/utils';
+import { formatDateTime, formatDate, truncate } from '@/lib/utils';
+import { isEventVisible, eventState } from '@/lib/visibility';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,9 +24,9 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const { id } = await params;
   const event = await prisma.event.findUnique({
     where: { id },
-    select: { title: true, summary: true, published: true },
+    select: { title: true, summary: true, published: true, publishAt: true },
   });
-  if (!event || !event.published) return { title: 'イベントが見つかりません' };
+  if (!event || !isEventVisible(event)) return { title: 'イベントが見つかりません' };
   return { title: event.title, description: truncate(event.summary, 120) };
 }
 
@@ -39,17 +40,24 @@ export default async function EventDetailPage({ params }: { params: Params }) {
     where: { id },
     include: {
       _count: { select: { attendances: { where: { status: 'ATTENDING' } } } },
-      attendances: user
-        ? { where: { userId: user.id }, select: { status: true, note: true } }
-        : false,
     },
   });
 
-  // 非公開イベントは管理者のみ閲覧可
-  if (!event || (!event.published && !isAdmin)) notFound();
+  // 非公開・予約公開のイベントは管理者のみ閲覧可
+  const nowForState = new Date();
+  if (!event) notFound();
+  const state = eventState(event, nowForState);
+  if (state !== 'PUBLISHED' && !isAdmin) notFound();
 
   const attendingCount = event._count.attendances;
-  const mine = user && event.attendances.length > 0 ? event.attendances[0] : null;
+
+  // ログイン中のユーザー自身の登録状況（未ログインなら null）
+  const mine = user
+    ? await prisma.eventAttendance.findUnique({
+        where: { eventId_userId: { eventId: event.id, userId: user.id } },
+        select: { status: true, note: true },
+      })
+    : null;
 
   const now = new Date();
   const isPast = event.startsAt < now;
@@ -68,9 +76,15 @@ export default async function EventDetailPage({ params }: { params: Params }) {
         items={[{ label: 'イベント', href: '/events' }, { label: truncate(event.title, 24) }]}
       />
 
-      {!event.published && (
+      {state === 'DRAFT' && (
         <Alert tone="warning" className="mb-6">
           このイベントは<strong>非公開</strong>です。管理者のみ閲覧できます。
+        </Alert>
+      )}
+      {state === 'SCHEDULED' && (
+        <Alert tone="warning" className="mb-6">
+          このイベントは<strong>予約公開</strong>です。
+          {formatDate(event.publishAt)}以降に自動で一般公開されます。
         </Alert>
       )}
 

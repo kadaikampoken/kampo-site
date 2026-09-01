@@ -12,7 +12,8 @@ import { ProgressBar } from '@/components/ui/progress-bar';
 import { DeleteButton } from '@/components/admin/delete-button';
 import { Flash } from '@/components/admin/flash';
 import { deleteProjectAction } from '@/app/actions/crowdfunding';
-import { achievementRate, formatDate, formatYen, truncate } from '@/lib/utils';
+import { achievementRate, formatDate, formatDateTime, formatYen, truncate } from '@/lib/utils';
+import { projectState, PUBLISH_STATE_LABEL, PUBLISH_STATE_TONE } from '@/lib/visibility';
 import { PROJECT_STATUS_LABEL } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
@@ -33,6 +34,7 @@ export default async function AdminCrowdfundingPage({
   searchParams: SearchParams;
 }) {
   const sp = await searchParams;
+  const now = new Date();
   const projects = await prisma.project.findMany({ orderBy: { updatedAt: 'desc' } });
 
   return (
@@ -54,15 +56,25 @@ export default async function AdminCrowdfundingPage({
       ) : (
         <ul className="space-y-4">
           {projects.map((p) => {
-            const rate = achievementRate(p.currentAmount, p.goalAmount);
+            const hasGoal = p.goalAmount !== null && p.goalAmount > 0;
+            const rate = hasGoal ? achievementRate(p.currentAmount, p.goalAmount ?? 0) : 0;
             return (
               <li key={p.id} className="rounded-lg border border-sand-200 bg-white p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="mb-1 flex items-center gap-2">
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
                       <Badge tone={tone[p.status]}>{PROJECT_STATUS_LABEL[p.status]}</Badge>
+                      <Badge tone={PUBLISH_STATE_TONE[projectState(p, now)]}>
+                        {PUBLISH_STATE_LABEL[projectState(p, now)]}
+                      </Badge>
+                      {projectState(p, now) === 'SCHEDULED' && (
+                        <span className="text-xs text-amber-800">
+                          {formatDateTime(p.publishAt)} に公開
+                        </span>
+                      )}
                       <span className="text-xs text-gray-500">
-                        {formatDate(p.startDate)} 〜 {formatDate(p.endDate)}
+                        {p.startDate ? formatDate(p.startDate) : '開始日未設定'} 〜{' '}
+                        {p.endDate ? formatDate(p.endDate) : '終了日未設定'}
                       </span>
                     </div>
                     <Link
@@ -73,6 +85,12 @@ export default async function AdminCrowdfundingPage({
                     </Link>
                   </div>
                   <div className="flex shrink-0 items-center gap-4">
+                    <Link
+                      href={`/admin/donations?projectId=${p.id}`}
+                      className="text-sm font-medium text-kampo-700 hover:underline"
+                    >
+                      支援一覧
+                    </Link>
                     <Link
                       href={`/admin/crowdfunding/${p.id}/edit`}
                       className="text-sm font-medium text-kampo-700 hover:underline"
@@ -91,13 +109,16 @@ export default async function AdminCrowdfundingPage({
                   <div className="mb-1.5 flex items-baseline justify-between text-sm">
                     <span className="font-semibold text-kampo-800">
                       {formatYen(p.currentAmount)}{' '}
-                      <span className="font-normal text-gray-500">/ {formatYen(p.goalAmount)}</span>
+                      <span className="font-normal text-gray-500">
+                        / {hasGoal ? formatYen(p.goalAmount ?? 0) : '目標なし'}
+                      </span>
                     </span>
                     <span className="text-gray-600">
-                      {rate}%・{p.supporterCount}人
+                      {hasGoal ? `${rate}%・` : ''}
+                      {p.supporterCount}人
                     </span>
                   </div>
-                  <ProgressBar rate={rate} />
+                  {hasGoal && <ProgressBar rate={rate} />}
                 </div>
               </li>
             );

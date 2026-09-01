@@ -60,6 +60,7 @@ model News {
   category    NewsCategory @default(ANNOUNCEMENT)
   coverImage  String?
   published   Boolean      @default(false)
+  /// 公開開始日時。未来の日時を入れると、その時刻まで一般には表示されない（予約公開）
   publishedAt DateTime?
   authorId    String?
   author      User?        @relation("NewsAuthor", fields: [authorId], references: [id], onDelete: SetNull)
@@ -86,22 +87,148 @@ model Project {
   title         String
   summary       String
   description   String
+  /// 支援を募集する目的
+  purpose       String?
+  /// 支援金の用途（内訳など）
+  fundUsage     String?
   coverImage    String?
-  /// 目標金額（円）
-  goalAmount    Int
-  /// 現在の支援総額（円）※外部CFサイトの値を管理画面から手入力
+  /// 目標金額（円）。未設定（null）も可
+  goalAmount    Int?
+  /// 公開用の累計支援額（円）。月次集計の確定時に自動反映される
   currentAmount Int           @default(0)
+  /// 公開用の累計支援者数（延べ）。月次集計の確定時に自動反映される
   supporterCount Int          @default(0)
   status        ProjectStatus @default(DRAFT)
-  startDate     DateTime
-  endDate       DateTime
-  /// 外部クラウドファンディングサイトへのリンク
+  /// 公開開始日時。未来の日時を入れるとその時刻まで非表示（null = 即時公開）
+  publishAt     DateTime?
+  /// 募集開始日。未設定（null）も可
+  startDate     DateTime?
+  /// 募集終了日。未設定（null）も可
+  endDate       DateTime?
+  /// 支援の受付（振込報告フォーム）を有効にするか
+  acceptingSupport Boolean    @default(true)
+  /// 外部クラウドファンディングサイトへのリンク（併用する場合）
   externalUrl   String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
+  donations       Donation[]
+  monthlySummaries MonthlySummary[]
+
   @@index([status, endDate])
+  @@index([status, publishAt])
   @@map("projects")
+}
+
+// ---------------------------------------------------------------------
+// 振込先口座（1件のみ。id は常に "default"）
+// ---------------------------------------------------------------------
+model BankAccount {
+  id            String   @id @default("default")
+  bankName      String
+  branchName    String
+  branchCode    String
+  /// 「普通預金」など
+  accountType   String
+  accountNumber String
+  accountHolder String
+  /// 名義人のカナ表記（任意）
+  accountHolderKana String?
+  /// 振込にあたっての注意事項（任意）
+  note          String?
+  updatedAt     DateTime @updatedAt
+
+  @@map("bank_account")
+}
+
+// ---------------------------------------------------------------------
+// 支援（振込報告）
+// ---------------------------------------------------------------------
+/// 支援者名の公開設定
+enum DonorDisclosure {
+  REAL_NAME   // 実名で掲載
+  CUSTOM_NAME // 指定した名前で掲載
+  ANONYMOUS   // 匿名
+}
+
+/// 入金確認の状態
+enum DonationStatus {
+  REPORTED  // 振込報告済み・入金未確認
+  CONFIRMED // 入金確認済み
+  VOID      // 確認不要／無効
+}
+
+model Donation {
+  id        String  @id @default(cuid())
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  /// 支援者氏名（管理者のみ閲覧可）
+  name         String
+  /// 連絡先メールアドレス（管理者のみ閲覧可）
+  email        String
+  /// 支援金額（円）※個人別金額は一般公開しない
+  amount       Int
+  /// 振込名義（通帳の表記。管理者のみ閲覧可）
+  transferName String
+  /// 振込日
+  transferDate DateTime
+
+  /// 支援者名の公開設定
+  disclosure  DonorDisclosure @default(ANONYMOUS)
+  /// 掲載希望名（CUSTOM_NAME のときに使用）
+  displayName String?
+  /// 支援者からの備考
+  note        String?
+
+  status      DonationStatus @default(REPORTED)
+  /// フォーム送信日時（振込報告日時）
+  reportedAt  DateTime       @default(now())
+  /// 管理者が入金を確認した日時
+  confirmedAt DateTime?
+  /// 管理者用メモ
+  adminMemo   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, transferDate])
+  @@index([projectId, status])
+  @@map("donations")
+}
+
+// ---------------------------------------------------------------------
+// 月次集計（管理者が月末に確定した公開用の実績）
+// ---------------------------------------------------------------------
+model MonthlySummary {
+  id    String @id @default(cuid())
+  year  Int
+  month Int
+
+  /// null = サイト全体の集計
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// 一意制約のためのキー。projectId が null のときは "ALL"
+  projectKey String
+
+  /// 支援総額（円）
+  totalAmount Int @default(0)
+  /// 支援件数（延べ）
+  donationCount Int @default(0)
+  /// 支援者数（実人数：メールアドレス単位で重複を除いた数）
+  uniqueSupporterCount Int @default(0)
+
+  /// 公開ページに表示するか
+  published   Boolean   @default(true)
+  /// 確定日時
+  confirmedAt DateTime  @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([year, month, projectKey])
+  @@index([year, month])
+  @@map("monthly_summaries")
 }
 
 // ---------------------------------------------------------------------
@@ -121,12 +248,15 @@ model Event {
   /// 参加申込の締切
   deadline    DateTime?
   published   Boolean  @default(false)
+  /// 公開開始日時。未来の日時を入れるとその時刻まで非表示（null = 即時公開）
+  publishAt   DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   attendances EventAttendance[]
 
   @@index([published, startsAt])
+  @@index([published, publishAt])
   @@map("events")
 }
 

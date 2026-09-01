@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/common/page-header';
 import { ProjectForm } from '@/components/admin/project-form';
 import { DeleteButton } from '@/components/admin/delete-button';
 import { updateProjectAction, deleteProjectAction } from '@/app/actions/crowdfunding';
-import { toDateValue, truncate, formatDateTime } from '@/lib/utils';
+import { toDateValue, toDateTimeLocalValue, truncate, formatDateTime } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'プロジェクトの編集' };
@@ -39,14 +39,18 @@ export default async function EditProjectPage({ params }: { params: Params }) {
             title: project.title,
             summary: project.summary,
             description: project.description,
+            purpose: project.purpose ?? '',
+            fundUsage: project.fundUsage ?? '',
             coverImage: project.coverImage ?? '',
-            goalAmount: String(project.goalAmount),
+            goalAmount: project.goalAmount === null ? '' : String(project.goalAmount),
             currentAmount: String(project.currentAmount),
             supporterCount: String(project.supporterCount),
             status: project.status,
             startDate: toDateValue(project.startDate),
             endDate: toDateValue(project.endDate),
             externalUrl: project.externalUrl ?? '',
+            publishAt: toDateTimeLocalValue(project.publishAt),
+            acceptingSupport: project.acceptingSupport,
           }}
         />
       </div>

@@ -20,6 +20,8 @@ export type NewsFormValues = {
   category: NewsCategory;
   coverImage: string;
   published: boolean;
+  /** 公開開始日時（datetime-local 形式の文字列） */
+  publishedAt: string;
 };
 
 const EMPTY: NewsFormValues = {
@@ -29,6 +31,7 @@ const EMPTY: NewsFormValues = {
   category: 'ANNOUNCEMENT',
   coverImage: '',
   published: false,
+  publishedAt: '',
 };
 
 export function NewsForm({
@@ -112,6 +115,23 @@ export function NewsForm({
             </span>
           </span>
         </label>
+
+        <div className="mt-4 border-t border-sand-200 pt-4">
+          <Field
+            label="公開開始日時（予約公開）"
+            htmlFor="publishedAt"
+            errors={state.errors?.publishedAt}
+            hint="空欄のままにすると、保存した時点ですぐ公開されます。未来の日時を指定すると、その時刻になるまで一般には表示されません（自動で公開されます）。"
+          >
+            <Input
+              id="publishedAt"
+              name="publishedAt"
+              type="datetime-local"
+              defaultValue={v.publishedAt}
+              error={Boolean(state.errors?.publishedAt)}
+            />
+          </Field>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-sand-200 pt-6">

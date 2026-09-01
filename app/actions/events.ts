@@ -9,6 +9,7 @@ import { redirect } from 'next/navigation';
 
 import { prisma } from '@/lib/prisma';
 import { assertAdmin, getSessionUser } from '@/lib/auth-guard';
+import { isEventVisible } from '@/lib/visibility';
 import {
   eventSchema,
   attendanceSchema,
@@ -105,6 +106,7 @@ export async function setAttendanceAction(
     select: {
       id: true,
       published: true,
+      publishAt: true,
       capacity: true,
       deadline: true,
       startsAt: true,
@@ -112,7 +114,8 @@ export async function setAttendanceAction(
     },
   });
 
-  if (!event || !event.published) {
+  // 未公開・予約公開中のイベントには登録できない
+  if (!event || !isEventVisible(event)) {
     return { ok: false, message: 'イベントが見つかりませんでした。' };
   }
 

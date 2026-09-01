@@ -12,6 +12,11 @@ import { ProjectCard } from '@/components/cards/project-card';
 import { EventCard } from '@/components/cards/event-card';
 import { formatDate, formatDateTime } from '@/lib/utils';
 import { SITE_DESCRIPTION, SITE_STATS } from '@/lib/constants';
+import {
+  visibleNewsWhere,
+  visibleEventWhere,
+  visibleProjectWhere,
+} from '@/lib/visibility';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,17 +48,17 @@ export default async function HomePage() {
 
   const [news, projects, events, timeline, registeredUserCount] = await Promise.all([
     prisma.news.findMany({
-      where: { published: true },
+      where: visibleNewsWhere(now),
       orderBy: { publishedAt: 'desc' },
       take: 3,
     }),
     prisma.project.findMany({
-      where: { status: { in: ['ACTIVE', 'SUCCEEDED'] } },
+      where: { ...visibleProjectWhere(now), status: { in: ['ACTIVE', 'SUCCEEDED'] } },
       orderBy: [{ status: 'asc' }, { endDate: 'desc' }],
       take: 2,
     }),
     prisma.event.findMany({
-      where: { published: true, startsAt: { gte: now } },
+      where: { ...visibleEventWhere(now), startsAt: { gte: now } },
       orderBy: { startsAt: 'asc' },
       take: 3,
       include: { _count: { select: { attendances: { where: { status: 'ATTENDING' } } } } },

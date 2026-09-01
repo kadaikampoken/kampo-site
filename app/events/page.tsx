@@ -13,6 +13,7 @@ import { EventCard } from '@/components/cards/event-card';
 import { Pagination } from '@/components/ui/pagination';
 import { PAGE_SIZE } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { visibleEventWhere } from '@/lib/visibility';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +31,7 @@ export default async function EventListPage({ searchParams }: { searchParams: Se
   const now = new Date();
 
   const where: Prisma.EventWhereInput = {
-    published: true,
+    ...visibleEventWhere(now),
     startsAt: filter === 'past' ? { lt: now } : { gte: now },
   };
 
