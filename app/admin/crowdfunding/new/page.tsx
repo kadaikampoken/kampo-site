@@ -1,10 +1,14 @@
 import { PageHeader } from '@/components/common/page-header';
+import { requireAdmin } from '@/lib/auth-guard';
 import { ProjectForm } from '@/components/admin/project-form';
 import { createProjectAction } from '@/app/actions/crowdfunding';
 
 export const metadata = { title: 'プロジェクトの新規作成' };
 
-export default function NewProjectPage() {
+export default async function NewProjectPage() {
+  // 管理者専用ページ（サポーターはアクセス不可）
+  await requireAdmin();
+
   return (
     <div>
       <PageHeader

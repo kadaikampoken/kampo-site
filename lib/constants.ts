@@ -94,5 +94,18 @@ export const DONOR_DISCLOSURE_OPTIONS = Object.entries(DONOR_DISCLOSURE_LABEL).m
 
 export const ROLE_LABEL: Record<Role, string> = {
   USER: '一般会員',
+  SUPPORTER: 'サポーター',
   ADMIN: '管理者',
 };
+
+export const ROLE_DESCRIPTION: Record<Role, string> = {
+  USER: 'イベントへの参加登録、会員一覧の閲覧ができます。',
+  SUPPORTER: 'イベントを作成し、自分が作成したイベントのみ編集・削除できます。',
+  ADMIN: 'すべての管理機能を利用できます。',
+};
+
+export const ROLE_TONE = {
+  USER: 'gray',
+  SUPPORTER: 'blue',
+  ADMIN: 'green',
+} as const;

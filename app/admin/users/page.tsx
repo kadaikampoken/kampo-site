@@ -11,7 +11,7 @@ import { DeleteButton } from '@/components/admin/delete-button';
 import { RoleForm } from '@/components/admin/role-form';
 import { deleteUserAction } from '@/app/actions/users';
 import { formatDate } from '@/lib/utils';
-import { ADMIN_PAGE_SIZE, ROLE_LABEL } from '@/lib/constants';
+import { ADMIN_PAGE_SIZE, ROLE_LABEL, ROLE_TONE, ROLE_DESCRIPTION } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'ユーザー管理' };
@@ -33,7 +33,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: S
       }
     : {};
 
-  const [total, users, adminCount] = await Promise.all([
+  const [total, users, adminCount, supporterCount] = await Promise.all([
     prisma.user.count({ where }),
     prisma.user.findMany({
       where,
@@ -43,6 +43,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: S
       include: { _count: { select: { attendances: true } } },
     }),
     prisma.user.count({ where: { role: 'ADMIN' } }),
+    prisma.user.count({ where: { role: 'SUPPORTER' } }),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
@@ -51,8 +52,17 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: S
     <div>
       <PageHeader
         title="ユーザー管理"
-        description={`全 ${total} 名（うち管理者 ${adminCount} 名）。パスワードはハッシュ化して保存されており、閲覧・復元はできません。`}
+        description={`全 ${total} 名（うち管理者 ${adminCount} 名／サポーター ${supporterCount} 名）。パスワードはハッシュ化して保存されており、閲覧・復元はできません。`}
       />
+
+      <div className="mb-6 grid gap-3 sm:grid-cols-3">
+        {(['ADMIN', 'SUPPORTER', 'USER'] as const).map((r) => (
+          <div key={r} className="rounded-lg border border-sand-200 bg-white p-4">
+            <p className="text-sm font-semibold text-kampo-900">{ROLE_LABEL[r]}</p>
+            <p className="mt-1 text-xs leading-relaxed text-gray-600">{ROLE_DESCRIPTION[r]}</p>
+          </div>
+        ))}
+      </div>
 
       {/* 検索 */}
       <form className="mb-6 flex gap-2" action="/admin/users">
@@ -108,9 +118,10 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: S
                       <td className="px-4 py-3 text-gray-700">{u._count.attendances} 件</td>
                       <td className="px-4 py-3">
                         <div className="mb-2">
-                          <Badge tone={u.role === 'ADMIN' ? 'green' : 'gray'}>
-                            {ROLE_LABEL[u.role]}
-                          </Badge>
+                          <Badge tone={ROLE_TONE[u.role]}>{ROLE_LABEL[u.role]}</Badge>
+                          <p className="mt-1 max-w-[16rem] text-xs leading-relaxed text-gray-500">
+                            {ROLE_DESCRIPTION[u.role]}
+                          </p>
                         </div>
                         <RoleForm userId={u.id} currentRole={u.role} disabled={isSelf} />
                       </td>

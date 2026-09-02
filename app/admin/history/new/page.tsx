@@ -1,10 +1,14 @@
 import { PageHeader } from '@/components/common/page-header';
+import { requireAdmin } from '@/lib/auth-guard';
 import { TimelineForm } from '@/components/admin/timeline-form';
 import { createTimelineAction } from '@/app/actions/timeline';
 
 export const metadata = { title: '年表の新規作成' };
 
-export default function NewTimelinePage() {
+export default async function NewTimelinePage() {
+  // 管理者専用ページ（サポーターはアクセス不可）
+  await requireAdmin();
+
   return (
     <div>
       <PageHeader

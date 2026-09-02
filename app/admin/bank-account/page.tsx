@@ -3,6 +3,7 @@
  * 振込先口座の設定（管理者のみ）
  */
 import { PageHeader } from '@/components/common/page-header';
+import { requireAdmin } from '@/lib/auth-guard';
 import { BankAccountForm } from '@/components/admin/bank-account-form';
 import { BankAccountCard } from '@/components/bank-account-card';
 import { getBankAccount } from '@/lib/bank';
@@ -11,6 +12,9 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: '振込先設定' };
 
 export default async function AdminBankAccountPage() {
+  // 管理者専用ページ（サポーターはアクセス不可）
+  await requireAdmin();
+
   const account = await getBankAccount();
 
   return (

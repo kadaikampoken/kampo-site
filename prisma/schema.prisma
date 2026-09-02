@@ -17,7 +17,11 @@ datasource db {
 // ユーザー / 権限
 // ---------------------------------------------------------------------
 enum Role {
+  /// 一般会員
   USER
+  /// サポーター：イベントの作成と、自分が作成したイベントの編集・削除のみ可能
+  SUPPORTER
+  /// 管理者：すべての操作が可能
   ADMIN
 }
 
@@ -33,8 +37,9 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  attendances EventAttendance[]
-  newsPosts   News[]            @relation("NewsAuthor")
+  attendances    EventAttendance[]
+  newsPosts      News[]            @relation("NewsAuthor")
+  createdEvents  Event[]           @relation("EventCreator")
 
   @@index([role])
   @@map("users")
@@ -250,6 +255,9 @@ model Event {
   published   Boolean  @default(false)
   /// 公開開始日時。未来の日時を入れるとその時刻まで非表示（null = 即時公開）
   publishAt   DateTime?
+  /// 作成者。サポーターは自分が作成したイベントのみ編集・削除できる
+  createdById String?
+  createdBy   User?    @relation("EventCreator", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -257,6 +265,7 @@ model Event {
 
   @@index([published, startsAt])
   @@index([published, publishAt])
+  @@index([createdById])
   @@map("events")
 }
 

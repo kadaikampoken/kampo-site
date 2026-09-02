@@ -2,13 +2,14 @@
  * app/admin/donations/page.tsx
  * 支援報告（振込報告）の一覧と入金確認。
  *
- * このページは管理者専用（app/admin/layout.tsx の requireAdmin で保護）。
+ * このページは管理者専用。サポーターはアクセスできない。
  * 氏名・メールアドレス・振込名義・個人別の支援金額はここでのみ閲覧できる。
  */
 import Link from 'next/link';
 import type { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
+import { requireAdmin } from '@/lib/auth-guard';
 import { PageHeader } from '@/components/common/page-header';
 import { EmptyState } from '@/components/common/empty-state';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +33,9 @@ type SearchParams = Promise<Record<string, string | undefined>>;
 const STATUS_KEYS = ['REPORTED', 'CONFIRMED', 'VOID'] as const;
 
 export default async function AdminDonationsPage({ searchParams }: { searchParams: SearchParams }) {
+  // 管理者専用ページ（サポーターはアクセス不可）
+  await requireAdmin();
+
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.page ?? '1') || 1);
   const q = (sp.q ?? '').trim();

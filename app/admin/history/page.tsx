@@ -2,6 +2,7 @@
  * app/admin/history/page.tsx  （項目41：年表管理）
  */
 import Link from 'next/link';
+import { requireAdmin } from '@/lib/auth-guard';
 
 import { prisma } from '@/lib/prisma';
 import { PageHeader } from '@/components/common/page-header';
@@ -19,6 +20,9 @@ export const metadata = { title: '年表管理' };
 type SearchParams = Promise<Record<string, string | undefined>>;
 
 export default async function AdminHistoryPage({ searchParams }: { searchParams: SearchParams }) {
+  // 管理者専用ページ（サポーターはアクセス不可）
+  await requireAdmin();
+
   const sp = await searchParams;
   const entries = await prisma.timelineEntry.findMany({
     orderBy: [{ year: 'desc' }, { month: 'desc' }],

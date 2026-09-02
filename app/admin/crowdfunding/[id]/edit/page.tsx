@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { requireAdmin } from '@/lib/auth-guard';
 
 import { prisma } from '@/lib/prisma';
 import { PageHeader } from '@/components/common/page-header';
@@ -13,6 +14,9 @@ export const metadata = { title: 'プロジェクトの編集' };
 type Params = Promise<{ id: string }>;
 
 export default async function EditProjectPage({ params }: { params: Params }) {
+  // 管理者専用ページ（サポーターはアクセス不可）
+  await requireAdmin();
+
   const { id } = await params;
   const project = await prisma.project.findUnique({ where: { id } });
   if (!project) notFound();

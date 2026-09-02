@@ -2,6 +2,7 @@
  * app/admin/participants/page.tsx  （項目43：参加者管理）
  */
 import Link from 'next/link';
+import { requireAdmin } from '@/lib/auth-guard';
 import type { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
@@ -23,6 +24,9 @@ export default async function AdminParticipantsPage({
 }: {
   searchParams: SearchParams;
 }) {
+  // 管理者専用ページ（サポーターはアクセス不可）
+  await requireAdmin();
+
   const sp = await searchParams;
   const eventId = sp.eventId;
   const status = sp.status === 'NOT_ATTENDING' ? 'NOT_ATTENDING' : sp.status === 'ATTENDING' ? 'ATTENDING' : undefined;

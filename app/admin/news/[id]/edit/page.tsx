@@ -2,6 +2,7 @@
  * app/admin/news/[id]/edit/page.tsx
  */
 import { notFound } from 'next/navigation';
+import { requireAdmin } from '@/lib/auth-guard';
 
 import { prisma } from '@/lib/prisma';
 import { PageHeader } from '@/components/common/page-header';
@@ -16,6 +17,9 @@ export const metadata = { title: '広報の編集' };
 type Params = Promise<{ id: string }>;
 
 export default async function EditNewsPage({ params }: { params: Params }) {
+  // 管理者専用ページ（サポーターはアクセス不可）
+  await requireAdmin();
+
   const { id } = await params;
   const news = await prisma.news.findUnique({ where: { id } });
   if (!news) notFound();

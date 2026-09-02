@@ -8,7 +8,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
 import { prisma } from '@/lib/prisma';
-import { assertAdmin, getSessionUser } from '@/lib/auth-guard';
+import { assertAdmin, assertStaff, getSessionUser, canEditEvent } from '@/lib/auth-guard';
 import { isEventVisible } from '@/lib/visibility';
 import {
   eventSchema,
@@ -35,7 +35,8 @@ export async function createEventAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const guard = await assertAdmin();
+  // 管理者・サポーターともにイベントを作成できる
+  const guard = await assertStaff();
   if (!guard.ok) return { ok: false, message: guard.message };
 
   const parsed = eventSchema.safeParse(Object.fromEntries(formData.entries()));
@@ -43,7 +44,8 @@ export async function createEventAction(
     return { ok: false, errors: toFieldErrors(parsed.error), values: formDataToObject(formData) };
   }
 
-  await prisma.event.create({ data: parsed.data });
+  // 作成者を記録する（サポーターが後から編集できるようにするため）
+  await prisma.event.create({ data: { ...parsed.data, createdById: guard.user.id } });
   revalidateEvents();
   redirect('/admin/events?created=1');
 }
@@ -53,7 +55,7 @@ export async function updateEventAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  const guard = await assertAdmin();
+  const guard = await assertStaff();
   if (!guard.ok) return { ok: false, message: guard.message };
 
   const parsed = eventSchema.safeParse(Object.fromEntries(formData.entries()));
@@ -61,8 +63,16 @@ export async function updateEventAction(
     return { ok: false, errors: toFieldErrors(parsed.error), values: formDataToObject(formData) };
   }
 
-  const exists = await prisma.event.findUnique({ where: { id }, select: { id: true } });
-  if (!exists) return { ok: false, message: 'イベントが見つかりませんでした。' };
+  const target = await prisma.event.findUnique({
+    where: { id },
+    select: { id: true, createdById: true },
+  });
+  if (!target) return { ok: false, message: 'イベントが見つかりませんでした。' };
+
+  // サポーターは自分が作成したイベントのみ編集できる
+  if (!canEditEvent(guard.user, target)) {
+    return { ok: false, message: 'このイベントを編集する権限がありません。' };
+  }
 
   await prisma.event.update({ where: { id }, data: parsed.data });
   revalidateEvents(id);
@@ -70,11 +80,20 @@ export async function updateEventAction(
 }
 
 export async function deleteEventAction(formData: FormData): Promise<void> {
-  const guard = await assertAdmin();
+  const guard = await assertStaff();
   if (!guard.ok) return;
 
   const id = formData.get('id');
   if (typeof id !== 'string' || !id) return;
+
+  const target = await prisma.event.findUnique({
+    where: { id },
+    select: { id: true, createdById: true },
+  });
+  if (!target) return;
+
+  // サポーターは自分が作成したイベントのみ削除できる
+  if (!canEditEvent(guard.user, target)) return;
 
   // 参加登録は onDelete: Cascade で一緒に削除される
   await prisma.event.delete({ where: { id } }).catch(() => null);

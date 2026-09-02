@@ -1,7 +1,8 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 
 import { prisma } from '@/lib/prisma';
+import { requireStaff, isAdmin, canEditEvent } from '@/lib/auth-guard';
 import { PageHeader } from '@/components/common/page-header';
 import { EventForm } from '@/components/admin/event-form';
 import { DeleteButton } from '@/components/admin/delete-button';
@@ -15,11 +16,18 @@ type Params = Promise<{ id: string }>;
 
 export default async function EditEventPage({ params }: { params: Params }) {
   const { id } = await params;
+  const user = await requireStaff();
+
   const event = await prisma.event.findUnique({
     where: { id },
-    include: { _count: { select: { attendances: true } } },
+    include: { _count: { select: { attendances: true } }, createdBy: { select: { name: true } } },
   });
   if (!event) notFound();
+
+  // サポーターは自分が作成したイベント以外は開けない
+  if (!canEditEvent(user, event)) {
+    redirect('/admin/events?error=forbidden');
+  }
 
   const action = updateEventAction.bind(null, event.id);
 
@@ -34,12 +42,18 @@ export default async function EditEventPage({ params }: { params: Params }) {
           { label: truncate(event.title, 20) },
         ]}
         action={
-          <Link
-            href={`/admin/participants?eventId=${event.id}`}
-            className="text-sm text-kampo-700 underline hover:text-kampo-900"
-          >
-            参加者一覧（{event._count.attendances}件）
-          </Link>
+          isAdmin(user.role) ? (
+            <Link
+              href={`/admin/participants?eventId=${event.id}`}
+              className="text-sm text-kampo-700 underline hover:text-kampo-900"
+            >
+              参加者一覧（{event._count.attendances}件）
+            </Link>
+          ) : (
+            <span className="text-sm text-gray-500">
+              参加登録 {event._count.attendances} 件
+            </span>
+          )
         }
       />
 

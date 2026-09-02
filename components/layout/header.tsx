@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { auth } from '@/auth';
 import { signOutAction } from '@/app/actions/auth';
-import { MAIN_NAV } from '@/lib/nav';
+import { MAIN_NAV, type NavItem } from '@/lib/nav';
 import { SITE_NAME } from '@/lib/constants';
 import { NavLink } from './nav-link';
 import { MobileNav } from './mobile-nav';
@@ -13,6 +13,12 @@ export async function Header() {
   const session = await auth();
   const user = session?.user;
   const isAdmin = user?.role === 'ADMIN';
+  const isStaff = user?.role === 'ADMIN' || user?.role === 'SUPPORTER';
+
+  // 会員一覧はログインした会員のみに見せる
+  const navItems: NavItem[] = user
+    ? [...MAIN_NAV, { href: '/members', label: '会員一覧' }]
+    : MAIN_NAV;
 
   return (
     <header className="sticky top-0 z-40 border-b border-sand-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
@@ -36,7 +42,7 @@ export async function Header() {
         {/* PC ナビ */}
         <nav aria-label="メインナビゲーション" className="hidden md:block">
           <ul className="flex items-center gap-6">
-            {MAIN_NAV.map((item) => (
+            {navItems.map((item) => (
               <li key={item.href}>
                 <NavLink href={item.href}>{item.label}</NavLink>
               </li>
@@ -46,7 +52,7 @@ export async function Header() {
 
         {/* 右側：認証状態 */}
         <div className="hidden items-center gap-3 md:flex">
-          {isAdmin && (
+          {isStaff && (
             <Link
               href="/admin"
               className="rounded-md bg-sand-100 px-3 py-1.5 text-sm font-medium text-sand-800 hover:bg-sand-200"
@@ -88,9 +94,9 @@ export async function Header() {
 
         {/* モバイルナビ */}
         <MobileNav
-          items={MAIN_NAV}
+          items={navItems}
           isLoggedIn={Boolean(user)}
-          isAdmin={isAdmin}
+          isAdmin={isStaff}
           userName={user?.name}
           signOutAction={signOutAction}
         />

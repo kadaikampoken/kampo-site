@@ -7,9 +7,23 @@ import type { NextAuthConfig } from 'next-auth';
 import type { Role } from '@prisma/client';
 
 /** ログインが必須なパス */
-const PROTECTED_PREFIXES = ['/mypage', '/admin'];
-/** 管理者のみアクセス可能なパス */
-const ADMIN_PREFIXES = ['/admin'];
+const PROTECTED_PREFIXES = ['/mypage', '/admin', '/members'];
+/** 管理者またはサポーターがアクセスできる管理エリア */
+const STAFF_PREFIXES = ['/admin'];
+/**
+ * 管理者のみアクセス可能なパス。
+ * サポーターは「イベント管理」と「ダッシュボード」以外に入れない。
+ */
+const ADMIN_ONLY_PREFIXES = [
+  '/admin/news',
+  '/admin/crowdfunding',
+  '/admin/donations',
+  '/admin/monthly',
+  '/admin/bank-account',
+  '/admin/history',
+  '/admin/users',
+  '/admin/participants',
+];
 /** ログイン済みならアクセスさせないパス */
 const GUEST_ONLY_PATHS = ['/login', '/register'];
 
@@ -49,12 +63,20 @@ export const authConfig = {
         return Response.redirect(loginUrl);
       }
 
-      // 管理者専用エリアの権限チェック
-      const needsAdmin = ADMIN_PREFIXES.some(
+      // 管理エリア（/admin）は管理者とサポーターのみ
+      const needsStaff = STAFF_PREFIXES.some(
+        (p) => path === p || path.startsWith(`${p}/`)
+      );
+      if (needsStaff && role !== 'ADMIN' && role !== 'SUPPORTER') {
+        return Response.redirect(new URL('/mypage?error=forbidden', nextUrl));
+      }
+
+      // 管理者専用の管理メニューはサポーターも入れない
+      const needsAdmin = ADMIN_ONLY_PREFIXES.some(
         (p) => path === p || path.startsWith(`${p}/`)
       );
       if (needsAdmin && role !== 'ADMIN') {
-        return Response.redirect(new URL('/mypage?error=forbidden', nextUrl));
+        return Response.redirect(new URL('/admin?error=admin_only', nextUrl));
       }
 
       return true;

@@ -2,12 +2,16 @@
  * app/admin/news/new/page.tsx
  */
 import { PageHeader } from '@/components/common/page-header';
+import { requireAdmin } from '@/lib/auth-guard';
 import { NewsForm } from '@/components/admin/news-form';
 import { createNewsAction } from '@/app/actions/news';
 
 export const metadata = { title: '広報の新規作成' };
 
-export default function NewNewsPage() {
+export default async function NewNewsPage() {
+  // 管理者専用ページ（サポーターはアクセス不可）
+  await requireAdmin();
+
   return (
     <div>
       <PageHeader

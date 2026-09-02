@@ -2,6 +2,7 @@
  * app/admin/crowdfunding/page.tsx  （項目39）
  */
 import Link from 'next/link';
+import { requireAdmin } from '@/lib/auth-guard';
 
 import { prisma } from '@/lib/prisma';
 import { PageHeader } from '@/components/common/page-header';
@@ -33,6 +34,9 @@ export default async function AdminCrowdfundingPage({
 }: {
   searchParams: SearchParams;
 }) {
+  // 管理者専用ページ（サポーターはアクセス不可）
+  await requireAdmin();
+
   const sp = await searchParams;
   const now = new Date();
   const projects = await prisma.project.findMany({ orderBy: { updatedAt: 'desc' } });

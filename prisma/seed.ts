@@ -69,7 +69,20 @@ async function main() {
       })
     )
   );
-  console.log(`ユーザー: ${members.length + 1} 件`);
+
+  // サポーター（イベントの企画担当）
+  const supporter = await prisma.user.create({
+    data: {
+      name: '中村 企画',
+      email: 'supporter@example.com',
+      passwordHash: memberHash,
+      role: Role.SUPPORTER,
+      affiliation: '医学部医学科 4年',
+      bio: '勉強会の企画を担当しています。イベントの立案・運営が主な役割です。',
+    },
+  });
+
+  console.log(`ユーザー: ${members.length + 2} 件（管理者1・サポーター1・一般4）`);
 
   // ------------------------------------------------------------------
   // 広報
@@ -306,6 +319,7 @@ async function main() {
         capacity: 40,
         deadline: daysFromNow(6, 23, 59),
         published: true,
+        createdById: supporter.id,
       },
     }),
     prisma.event.create({
@@ -327,6 +341,7 @@ async function main() {
         capacity: 20,
         deadline: daysFromNow(18, 23, 59),
         published: true,
+        createdById: supporter.id,
       },
     }),
     prisma.event.create({
@@ -581,6 +596,7 @@ async function main() {
 
   console.log('--- seed 完了 ---');
   console.log(`管理者ログイン: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
+  console.log('サポーター例: supporter@example.com / Member1234!');
   console.log('一般ユーザー例: taro@example.com / Member1234!');
 }
 

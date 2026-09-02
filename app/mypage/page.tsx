@@ -14,7 +14,7 @@ import { Alert } from '@/components/ui/alert';
 import { LinkButton } from '@/components/ui/button';
 import { ProfileForm, PasswordForm } from '@/components/forms/profile-form';
 import { formatDate, formatDateTime } from '@/lib/utils';
-import { ROLE_LABEL, ATTENDANCE_LABEL } from '@/lib/constants';
+import { ROLE_LABEL, ROLE_TONE, ROLE_DESCRIPTION, ATTENDANCE_LABEL } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,11 +52,16 @@ export default async function MyPage({ searchParams }: { searchParams: SearchPar
         description={`${user.name} さんの登録情報と参加予定です。`}
         breadcrumbs={[{ label: 'マイページ' }]}
         action={
-          user.role === 'ADMIN' ? (
-            <LinkButton href="/admin" variant="secondary">
-              管理画面へ
+          <div className="flex flex-wrap gap-2">
+            <LinkButton href="/members" variant="outline">
+              会員一覧
             </LinkButton>
-          ) : undefined
+            {(user.role === 'ADMIN' || user.role === 'SUPPORTER') && (
+              <LinkButton href="/admin" variant="secondary">
+                管理画面へ
+              </LinkButton>
+            )}
+          </div>
         }
       />
 
@@ -183,9 +188,10 @@ export default async function MyPage({ searchParams }: { searchParams: SearchPar
               <div>
                 <dt className="text-gray-500">権限</dt>
                 <dd>
-                  <Badge tone={user.role === 'ADMIN' ? 'green' : 'gray'}>
-                    {ROLE_LABEL[user.role]}
-                  </Badge>
+                  <Badge tone={ROLE_TONE[user.role]}>{ROLE_LABEL[user.role]}</Badge>
+                  <span className="mt-1 block text-xs leading-relaxed text-gray-500">
+                    {ROLE_DESCRIPTION[user.role]}
+                  </span>
                 </dd>
               </div>
               <div>

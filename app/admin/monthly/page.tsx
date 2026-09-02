@@ -3,6 +3,7 @@
  * 月次集計の確定と、確定済み実績の管理。
  */
 import Link from 'next/link';
+import { requireAdmin } from '@/lib/auth-guard';
 
 import { prisma } from '@/lib/prisma';
 import { PageHeader } from '@/components/common/page-header';
@@ -21,6 +22,9 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: '月次集計' };
 
 export default async function AdminMonthlyPage() {
+  // 管理者専用ページ（サポーターはアクセス不可）
+  await requireAdmin();
+
   const now = new Date();
   // 既定は「先月」（月末に前月分を確定する運用を想定）
   const target = new Date(now.getFullYear(), now.getMonth() - 1, 1);

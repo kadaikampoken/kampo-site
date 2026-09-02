@@ -2,19 +2,23 @@
 
 /**
  * components/admin/admin-nav.tsx
+ * 権限に応じて表示するメニューを切り替える（サポーターにはイベント管理のみ）
  */
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ADMIN_NAV } from '@/lib/nav';
+import type { Role } from '@prisma/client';
+
+import { adminNavFor } from '@/lib/nav';
 import { cn } from '@/lib/utils';
 
-export function AdminNav() {
+export function AdminNav({ role }: { role: Role }) {
   const pathname = usePathname();
+  const items = adminNavFor(role);
 
   return (
     <nav aria-label="管理メニュー" className="overflow-x-auto">
       <ul className="flex gap-1 border-b border-sand-200 md:flex-col md:gap-0.5 md:border-b-0">
-        {ADMIN_NAV.map((item) => {
+        {items.map((item) => {
           const active =
             item.href === '/admin' ? pathname === '/admin' : pathname.startsWith(item.href);
           return (

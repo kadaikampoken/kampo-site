@@ -1,20 +1,127 @@
 /**
  * app/admin/page.tsx  （項目37：管理者ダッシュボード）
+ * 管理者にはサイト全体の状況を、サポーターには自分のイベントの状況を表示する。
  */
 import Link from 'next/link';
 
 import { prisma } from '@/lib/prisma';
+import { requireStaff, isAdmin } from '@/lib/auth-guard';
 import { PageHeader } from '@/components/common/page-header';
 import { Badge } from '@/components/ui/badge';
+import { LinkButton } from '@/components/ui/button';
+import { Alert } from '@/components/ui/alert';
+import { EmptyState } from '@/components/common/empty-state';
+import { eventState, PUBLISH_STATE_LABEL, PUBLISH_STATE_TONE } from '@/lib/visibility';
 import { formatDateTime, formatDate, formatYen } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata = { title: 'ダッシュボード' };
 
-export default async function AdminDashboardPage() {
+type SearchParams = Promise<Record<string, string | undefined>>;
+
+export default async function AdminDashboardPage({ searchParams }: { searchParams: SearchParams }) {
+  const user = await requireStaff();
+  const sp = await searchParams;
   const now = new Date();
 
+  /* ================================================================
+   * サポーター向けのダッシュボード
+   * ================================================================ */
+  if (!isAdmin(user.role)) {
+    const [myEvents, myUpcoming, myAttendances] = await Promise.all([
+      prisma.event.findMany({
+        where: { createdById: user.id },
+        orderBy: { startsAt: 'desc' },
+        take: 10,
+        include: { _count: { select: { attendances: { where: { status: 'ATTENDING' } } } } },
+      }),
+      prisma.event.count({ where: { createdById: user.id, startsAt: { gte: now } } }),
+      prisma.eventAttendance.count({
+        where: { status: 'ATTENDING', event: { createdById: user.id } },
+      }),
+    ]);
+
+    return (
+      <div>
+        <PageHeader
+          title="ダッシュボード"
+          description={`${user.name} さんが作成したイベントの状況です。`}
+          action={<LinkButton href="/admin/events/new">イベントを作成</LinkButton>}
+        />
+
+        <Alert tone="info" className="mb-6">
+          サポーター権限では、<strong>イベントの作成</strong>と、
+          <strong>ご自身が作成したイベントの編集・削除</strong>ができます。
+          広報・クラウドファンディング・会員情報の変更はできません。
+        </Alert>
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="rounded-lg border border-sand-200 bg-white p-5">
+            <p className="text-xs text-gray-500">作成したイベント</p>
+            <p className="mt-1 text-2xl font-bold text-kampo-800">{myEvents.length} 件</p>
+          </div>
+          <div className="rounded-lg border border-sand-200 bg-white p-5">
+            <p className="text-xs text-gray-500">開催予定</p>
+            <p className="mt-1 text-2xl font-bold text-kampo-800">{myUpcoming} 件</p>
+          </div>
+          <div className="rounded-lg border border-sand-200 bg-white p-5">
+            <p className="text-xs text-gray-500">参加登録（延べ）</p>
+            <p className="mt-1 text-2xl font-bold text-kampo-800">{myAttendances} 件</p>
+          </div>
+        </div>
+
+        <section className="mt-10">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-base font-bold text-kampo-900">あなたが作成したイベント</h2>
+            <Link href="/admin/events" className="text-sm text-kampo-700 underline">
+              すべて見る
+            </Link>
+          </div>
+
+          {myEvents.length === 0 ? (
+            <EmptyState
+              title="まだイベントを作成していません"
+              description="「イベントを作成」から追加できます。"
+              actionLabel="イベントを作成"
+              actionHref="/admin/events/new"
+            />
+          ) : (
+            <ul className="divide-y divide-sand-200 rounded-lg border border-sand-200 bg-white">
+              {myEvents.map((e) => (
+                <li key={e.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+                  <div className="min-w-0">
+                    <Link
+                      href={`/admin/events/${e.id}/edit`}
+                      className="block truncate text-sm font-medium text-kampo-900 hover:underline"
+                    >
+                      {e.title}
+                    </Link>
+                    <p className="text-xs text-gray-500">{formatDateTime(e.startsAt)}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="text-xs text-gray-600">
+                      {e._count.attendances}
+                      {e.capacity !== null ? ` / ${e.capacity}` : ''} 名
+                    </span>
+                    <Badge tone={PUBLISH_STATE_TONE[eventState(e, now)]}>
+                      {eventState(e, now) === 'DRAFT'
+                        ? '非公開'
+                        : PUBLISH_STATE_LABEL[eventState(e, now)]}
+                    </Badge>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+    );
+  }
+
+  /* ================================================================
+   * 管理者向けのダッシュボード
+   * ================================================================ */
   const [
     newsTotal,
     newsDraft,
@@ -23,6 +130,7 @@ export default async function AdminDashboardPage() {
     projectActive,
     userTotal,
     adminTotal,
+    supporterTotal,
     attendanceTotal,
     timelineTotal,
     recentNews,
@@ -39,6 +147,7 @@ export default async function AdminDashboardPage() {
     prisma.project.count({ where: { status: 'ACTIVE' } }),
     prisma.user.count(),
     prisma.user.count({ where: { role: 'ADMIN' } }),
+    prisma.user.count({ where: { role: 'SUPPORTER' } }),
     prisma.eventAttendance.count({ where: { status: 'ATTENDING' } }),
     prisma.timelineEntry.count(),
     prisma.news.findMany({ orderBy: { updatedAt: 'desc' }, take: 5 }),
@@ -46,7 +155,10 @@ export default async function AdminDashboardPage() {
       where: { startsAt: { gte: now } },
       orderBy: { startsAt: 'asc' },
       take: 5,
-      include: { _count: { select: { attendances: { where: { status: 'ATTENDING' } } } } },
+      include: {
+        _count: { select: { attendances: { where: { status: 'ATTENDING' } } } },
+        createdBy: { select: { name: true } },
+      },
     }),
     prisma.user.findMany({ orderBy: { createdAt: 'desc' }, take: 5 }),
     prisma.project.aggregate({ _sum: { currentAmount: true } }),
@@ -58,7 +170,7 @@ export default async function AdminDashboardPage() {
     { label: '広報記事', value: `${newsTotal} 件`, sub: `下書き ${newsDraft} 件`, href: '/admin/news' },
     { label: 'イベント', value: `${eventTotal} 件`, sub: `開催予定 ${eventUpcoming} 件`, href: '/admin/events' },
     { label: '募集中のCF', value: `${projectActive} 件`, sub: `累計 ${formatYen(fundSum._sum.currentAmount ?? 0)}`, href: '/admin/crowdfunding' },
-    { label: '登録ユーザー', value: `${userTotal} 名`, sub: `管理者 ${adminTotal} 名`, href: '/admin/users' },
+    { label: '登録ユーザー', value: `${userTotal} 名`, sub: `管理者 ${adminTotal} 名／サポーター ${supporterTotal} 名`, href: '/admin/users' },
     { label: '参加登録', value: `${attendanceTotal} 件`, sub: '参加ステータスのみ', href: '/admin/participants' },
     { label: '年表エントリ', value: `${timelineTotal} 件`, sub: '公開中の項目を含む', href: '/admin/history' },
     {
@@ -72,6 +184,12 @@ export default async function AdminDashboardPage() {
   return (
     <div>
       <PageHeader title="ダッシュボード" description="サイト全体の状況を確認できます。" />
+
+      {sp.error === 'admin_only' && (
+        <Alert tone="error" className="mb-6">
+          そのページは管理者のみが利用できます。
+        </Alert>
+      )}
 
       {/* 統計 */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -141,7 +259,10 @@ export default async function AdminDashboardPage() {
                   >
                     {e.title}
                   </Link>
-                  <p className="text-xs text-gray-500">{formatDateTime(e.startsAt)}</p>
+                  <p className="text-xs text-gray-500">
+                    {formatDateTime(e.startsAt)}
+                    {e.createdBy && `／作成: ${e.createdBy.name}`}
+                  </p>
                 </div>
                 <span className="shrink-0 text-xs text-gray-600">
                   {e._count.attendances}
@@ -169,8 +290,10 @@ export default async function AdminDashboardPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-gray-500">{formatDate(u.createdAt)}</span>
-                  <Badge tone={u.role === 'ADMIN' ? 'green' : 'gray'}>
-                    {u.role === 'ADMIN' ? '管理者' : '一般'}
+                  <Badge
+                    tone={u.role === 'ADMIN' ? 'green' : u.role === 'SUPPORTER' ? 'blue' : 'gray'}
+                  >
+                    {u.role === 'ADMIN' ? '管理者' : u.role === 'SUPPORTER' ? 'サポーター' : '一般'}
                   </Badge>
                 </div>
               </li>

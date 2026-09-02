@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { requireAdmin } from '@/lib/auth-guard';
 
 import { prisma } from '@/lib/prisma';
 import { PageHeader } from '@/components/common/page-header';
@@ -13,6 +14,9 @@ export const metadata = { title: '年表の編集' };
 type Params = Promise<{ id: string }>;
 
 export default async function EditTimelinePage({ params }: { params: Params }) {
+  // 管理者専用ページ（サポーターはアクセス不可）
+  await requireAdmin();
+
   const { id } = await params;
   const entry = await prisma.timelineEntry.findUnique({ where: { id } });
   if (!entry) notFound();

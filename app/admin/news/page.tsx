@@ -2,6 +2,7 @@
  * app/admin/news/page.tsx  （項目38：広報管理）
  */
 import Link from 'next/link';
+import { requireAdmin } from '@/lib/auth-guard';
 
 import { prisma } from '@/lib/prisma';
 import { PageHeader } from '@/components/common/page-header';
@@ -22,6 +23,9 @@ export const metadata = { title: '広報管理' };
 type SearchParams = Promise<Record<string, string | undefined>>;
 
 export default async function AdminNewsPage({ searchParams }: { searchParams: SearchParams }) {
+  // 管理者専用ページ（サポーターはアクセス不可）
+  await requireAdmin();
+
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.page ?? '1') || 1);
   const now = new Date();
