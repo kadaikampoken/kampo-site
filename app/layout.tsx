@@ -7,23 +7,28 @@ import { SessionProvider } from 'next-auth/react';
 
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
-import { SITE_NAME, SITE_DESCRIPTION } from '@/lib/constants';
+import { SITE_NAME } from '@/lib/constants';
+import { getSiteSettings } from '@/lib/site-settings';
 import './globals.css';
 
-export const metadata: Metadata = {
-  title: {
-    default: `${SITE_NAME} | 東洋医学を学ぶ学生団体`,
-    template: `%s | ${SITE_NAME}`,
-  },
-  description: SITE_DESCRIPTION,
-  openGraph: {
-    title: SITE_NAME,
-    description: SITE_DESCRIPTION,
-    type: 'website',
-    locale: 'ja_JP',
-  },
-  robots: { index: true, follow: true },
-};
+// 説明文は管理画面「トップページ設定」の団体紹介文を使う
+export async function generateMetadata(): Promise<Metadata> {
+  const { description } = await getSiteSettings();
+  return {
+    title: {
+      default: `${SITE_NAME} | 東洋医学を学ぶ学生団体`,
+      template: `%s | ${SITE_NAME}`,
+    },
+    description,
+    openGraph: {
+      title: SITE_NAME,
+      description,
+      type: 'website',
+      locale: 'ja_JP',
+    },
+    robots: { index: true, follow: true },
+  };
+}
 
 export const viewport: Viewport = {
   width: 'device-width',

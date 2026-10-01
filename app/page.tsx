@@ -11,7 +11,8 @@ import { NewsCard } from '@/components/cards/news-card';
 import { ProjectCard } from '@/components/cards/project-card';
 import { EventCard } from '@/components/cards/event-card';
 import { formatDate, formatDateTime } from '@/lib/utils';
-import { SITE_DESCRIPTION, SITE_STATS } from '@/lib/constants';
+import { SITE_STATS } from '@/lib/constants';
+import { getSiteSettings, getFoundedYear } from '@/lib/site-settings';
 import {
   visibleNewsWhere,
   visibleEventWhere,
@@ -20,33 +21,11 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-const ACTIVITIES = [
-  {
-    title: '定例勉強会',
-    body: '月2回、方剤や病態をテーマに学生同士で学び合います。予備知識は不要です。',
-    icon: '📖',
-  },
-  {
-    title: '生薬見学会',
-    body: '実物の生薬に触れ、香り・形状・味から鑑別を学ぶ実習を年2回開催しています。',
-    icon: '🌿',
-  },
-  {
-    title: '地域健康講座',
-    body: '「未病」「養生」の考え方を、地域の皆さまへ学生の言葉でお届けしています。',
-    icon: '🏘️',
-  },
-  {
-    title: '会誌の発行',
-    body: '年1回、会員の研究報告や症例検討をまとめた会誌『薩摩漢方』を発行しています。',
-    icon: '📗',
-  },
-];
-
 export default async function HomePage() {
   const now = new Date();
 
-  const [news, projects, events, timeline, registeredUserCount] = await Promise.all([
+  const [news, projects, events, timeline, registeredUserCount, settings, foundedYear] =
+    await Promise.all([
     prisma.news.findMany({
       where: visibleNewsWhere(now),
       orderBy: { publishedAt: 'desc' },
@@ -69,11 +48,18 @@ export default async function HomePage() {
       take: 3,
     }),
     prisma.user.count(),
+    // 大見出し・団体紹介文・活動紹介（管理画面「トップページ設定」で編集）
+    getSiteSettings(),
+    // 発足年 = 年表の一番古い年
+    getFoundedYear(),
   ]);
 
-  // --- トップページの数値（lib/constants.ts の SITE_STATS で調整） ---
+  // --- トップページの数値 ---
+  // 会員数：SITE_STATS.memberCount が null なら登録アカウント数
   const memberCount = SITE_STATS.memberCount ?? registeredUserCount;
-  const activeYears = Math.max(1, new Date().getFullYear() - SITE_STATS.foundedYear);
+  // 活動年数：今年 − 発足年（年表の一番古い年）
+  const activeYears = Math.max(1, new Date().getFullYear() - foundedYear);
+  const heroTitleLines = settings.heroTitle.split(/\r?\n/);
 
   // 直近の開催予定（次回の部会）
   const nextEvent = events[0] ?? null;
@@ -88,12 +74,15 @@ export default async function HomePage() {
               鹿児島大学 公認学生団体
             </p>
             <h1 className="text-3xl font-bold leading-tight tracking-tight text-kampo-900 sm:text-5xl">
-              漢方医学を、
-              <br />
-              学生の手で学ぶ。
+              {heroTitleLines.map((line, i) => (
+                <span key={i}>
+                  {i > 0 && <br />}
+                  {line}
+                </span>
+              ))}
             </h1>
-            <p className="mt-6 text-base leading-relaxed text-gray-700 sm:text-lg">
-              {SITE_DESCRIPTION}
+            <p className="mt-6 whitespace-pre-line text-base leading-relaxed text-gray-700 sm:text-lg">
+              {settings.description}
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <LinkButton href="/events" size="lg">
@@ -171,13 +160,13 @@ export default async function HomePage() {
       <section className="mx-auto max-w-content px-4 py-16 sm:px-6">
         <SectionHeading title="わたしたちの活動" subtitle="学部・学年を問わず参加できます" />
         <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {ACTIVITIES.map((a) => (
-            <li key={a.title} className="rounded-lg border border-sand-200 bg-white p-5">
+          {settings.activities.map((a, i) => (
+            <li key={i} className="rounded-lg border border-sand-200 bg-white p-5">
               <p className="text-2xl" aria-hidden="true">
                 {a.icon}
               </p>
               <h3 className="mt-3 font-semibold text-kampo-900">{a.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-gray-600">{a.body}</p>
+              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-gray-600">{a.body}</p>
             </li>
           ))}
         </ul>

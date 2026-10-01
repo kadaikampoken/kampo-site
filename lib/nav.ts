@@ -18,6 +18,7 @@ export const MAIN_NAV: NavItem[] = [
 export const ADMIN_NAV: AdminNavItem[] = [
   { href: '/admin', label: 'ダッシュボード' },
   { href: '/admin/events', label: 'イベント管理' },
+  { href: '/admin/site', label: 'トップページ設定', adminOnly: true },
   { href: '/admin/news', label: '広報管理', adminOnly: true },
   { href: '/admin/crowdfunding', label: 'CF管理', adminOnly: true },
   { href: '/admin/donations', label: '支援報告', adminOnly: true },

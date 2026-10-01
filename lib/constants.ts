@@ -27,7 +27,10 @@ export const SITE_STATS = {
    */
   memberCount: null as number | null,
 
-  /** 発足年（西暦）。活動年数は「今年 − この値」で自動計算されます */
+  /**
+   * 発足年（西暦）の予備値。
+   * 発足年は年表の一番古い年から自動で求めます。年表が空のときだけこの値を使います。
+   */
   foundedYear: 2016,
 } as const;
 
