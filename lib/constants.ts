@@ -25,7 +25,7 @@ export const SITE_STATS = {
    *   数値を入れる  → その数値をそのまま表示（例: 60）
    *   null を入れる → サイトに登録されているユーザー数を自動集計して表示
    */
-  memberCount: 60 as number | null,
+  memberCount: null as number | null,
 
   /** 発足年（西暦）。活動年数は「今年 − この値」で自動計算されます */
   foundedYear: 2016,
